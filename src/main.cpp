@@ -40,13 +40,13 @@ int main()
 		frame = cv::Scalar(49, 52, 49);
 		
 		// Resize windows
-		int newHeight = std::min(frame.rows, image_height + 140);
+		int newHeight = std::min(frame.rows, image_height + 100);
 		int newWidth = std::min(frame.cols, image_width + 20);
 
 		image.setHeight(newHeight);
 		image.setWidth(newWidth);
 
-		cv::resize(cards_original, cards, { newWidth - 20, newHeight - 140});
+		cv::resize(cards_original, cards, { newWidth - 20, newHeight - 100});
 
 		// Render the settings window and its content, if it is not minimized.
 		settings.begin(frame);
@@ -61,8 +61,10 @@ int main()
 		
 		image.begin(frame);
 		if (!image.isMinimized()){
-			cvui::trackbar(200, &image_width, 220, frame.cols);
-			cvui::trackbar(200, &image_height, 220, frame.rows);
+			cvui::beginRow(-1, -1, 20);
+				cvui::trackbar(100, &image_width, 220, frame.cols);
+				cvui::trackbar(100, &image_height, 100, frame.rows);
+			cvui::endRow();
 			cvui::space(5);
 			cvui::image(cards);
 		}
