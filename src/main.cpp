@@ -23,7 +23,6 @@ int main()
 	int high_threshold = 150;
 	bool use_canny = false;
 
-
 	// Create a settings window using the EnhancedWindow class.
 	// int x, int y, int width, int height, const cv::String& title, bool minimizable = true, double theFontScale = cvui::DEFAULT_FONT_SCALE
 	EnhancedWindow settings(10, 50, 270, 180, "Settings");
@@ -31,6 +30,7 @@ int main()
 	int image_width = cards.cols;
 	int image_height = cards.rows;
 	double scale = 1.0;
+
 	// Init cvui and tell it to create a OpenCV window, i.e. cv::namedWindow(WINDOW_NAME).
 	cvui::init(WINDOW_NAME);
 
@@ -42,13 +42,19 @@ int main()
 		// Resize windows
 		int newHeight = std::min(frame.rows, image_height + 100);
 		int newWidth = std::min(frame.cols, image_width + 20);
-
 		image.setHeight(newHeight);
 		image.setWidth(newWidth);
-
 		cv::resize(cards_original, cards, { newWidth - 20, newHeight - 100});
 
 		// Render the settings window and its content, if it is not minimized.
+		if (use_canny) 
+		{
+			// Yes, we should apply it.
+			cv::cvtColor(cards_original, cards, cv::COLOR_BGR2GRAY);
+			cv::Canny(cards, cards, low_threshold, high_threshold, 3);
+			cv::cvtColor(cards, cards, cv::COLOR_GRAY2BGR);
+		}
+
 		settings.begin(frame);
 		if (!settings.isMinimized()) {
 			cvui::checkbox("Use Canny Edge", &use_canny);
