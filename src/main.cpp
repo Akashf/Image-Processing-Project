@@ -52,7 +52,7 @@ int main()
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
-	cv::Mat source = cv::imread("cards.jpg", cv::IMREAD_GRAYSCALE);
+	cv::Mat source = cv::imread("cards-scuffed.jpg", cv::IMREAD_GRAYSCALE);
 
 	// Load rank and suit templates
 	std::vector<std::pair<std::string, cv::Mat>> rank_images = {};
@@ -246,6 +246,8 @@ int main()
 
 			std::stringstream ss; 
 			ss << "Card: " << i++;
+
+			cv::imshow(ss.str(), img);
 		}
 
 		// For each image
@@ -320,7 +322,7 @@ int main()
 
 			std::stringstream ss;
 			ss << "Contours: " << i++;
-			cv::imshow(ss.str(), base);
+			// cv::imshow(ss.str(), base);
 
 			int min_diff = std::numeric_limits<int>().max();
 			float max_conf = 0;
@@ -341,9 +343,9 @@ int main()
 			}
 
 			ss.clear();
-			ss << "Rank: " << best_match << i++ << " " << max_conf;
+			ss << "Rank: " << best_match << " " << i++;
 
-			cv::imshow(ss.str(), boundedImage);
+			// cv::imshow(ss.str(), boundedImage);
 		}
 
 		// Select active stage 
