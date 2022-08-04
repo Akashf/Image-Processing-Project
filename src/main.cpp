@@ -52,7 +52,7 @@ int main()
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
-	cv::Mat source = cv::imread("cards.jpg", cv::IMREAD_GRAYSCALE);
+	cv::Mat source = cv::imread("cards.jpg");
 
 	// Load rank and suit templates
 	std::vector<std::pair<std::string, cv::Mat>> rank_images = {};
@@ -61,6 +61,7 @@ int main()
 		"Seven", "Eight", "Nine", "Ten", "Jack", "Queen",
 		"King"
 	};
+
 	for (const auto& rank: rank_names)
 	{
 		cv::Mat img = cv::imread("images/" + rank + ".png", cv::IMREAD_GRAYSCALE);
@@ -80,12 +81,12 @@ int main()
 	}
 
 	// Image to display 
-	cv::Mat cards = source.clone();
+	cv::Mat cards_color = source;
 
 	// Gaussian Parameters 
 	GaussianParameters gauss_params; 
-	gauss_params.kernel_size = 5;
-	gauss_params.sigma = 3;
+	gauss_params.kernel_size = 3;
+	gauss_params.sigma = 0;
 
 	// Canny parameters 
 	CannyParameters canny_params; 
@@ -101,9 +102,9 @@ int main()
 	// Create a settings window using the EnhancedWindow class.
 	// int x, int y, int width, int height, const cv::String& title, bool minimizable = true, double theFontScale = cvui::DEFAULT_FONT_SCALE
 	EnhancedWindow settings(0, 0, 320, window_height, "Settings");
-	EnhancedWindow image(settings.width(), 0, cards.cols + 20, cards.rows + 40, "Active Image");
-	int image_width = cards.cols;
-	int image_height = cards.rows;
+	EnhancedWindow image(settings.width(), 0, cards_color.cols + 20, cards_color.rows + 40, "Active Image");
+	int image_width = cards_color.cols;
+	int image_height = cards_color.rows;
 	double scale = 1.0;
 
 	// Init cvui and tell it to create a OpenCV window, i.e. cv::namedWindow(WINDOW_NAME).
@@ -114,7 +115,7 @@ int main()
 	std::vector<std::string> stage_titles = {
 		"Source",
 		"Blurred",
-		"Equalized",
+		// "Equalized",
 		"Edges",
 		"Contours",
 		"Rectangle Contours",
@@ -139,14 +140,15 @@ int main()
 	cv::Mat cam_frame; 
 	cv::VideoCapture camera(0);
 
+	bool camera_available = true;
 	if (!camera.isOpened())
 	{
 		std::cout << "Cannot connect to camera";
-		return 1;
+		camera_available = false;
 	}
 
 	bool use_camera = false;
-
+	cv::Mat cards;
 	while (true) 
 	{
 		// FPS Tracking 
@@ -160,13 +162,15 @@ int main()
 		if (use_camera)
 		{
 			camera >> cam_frame;
-			cv::cvtColor(cam_frame, cards, cv::COLOR_BGR2GRAY);
+			cards_color = cam_frame;
 		}
 		else
 		{
-			cards = source.clone();
+			cards_color = source.clone();
 		}
-		
+
+		cv::cvtColor(cards_color, cards, cv::COLOR_BGR2GRAY);
+
 		// Clear background color
 		frame = cv::Scalar(53, 101, 77);
 		if (save_image)
@@ -221,7 +225,7 @@ int main()
 			float e = 0.01 * cv::arcLength(c, true);
 			cv::approxPolyDP(c, output, e, true);
 
-			if (output.size() != 4 || cv::contourArea(output) < 500) {
+			if (output.size() != 4 || cv::contourArea(output) < 5000) {
 				continue; 
 			}
 
@@ -271,14 +275,6 @@ int main()
 
 			cv::warpPerspective(cards, img, p, cv::Size(250, 350));
 			card_images.push_back(img); 
-
-			std::stringstream ss; 
-			ss << "Card: " << i++;
-
-			if (i < 8)
-			{
-				// cv::imshow(ss.str(), img);
-			}
 		}
 
 		// Extract + identify rank
@@ -339,8 +335,6 @@ int main()
 			bounded_rank = ~bounded_rank;
 			bounded_eroded = ~bounded_eroded;
 
-			cv::imshow("Bounded Rank: " + std::to_string(i++), bounded_dilated);
-
 			cv::Mat rank_identity = bounded_dilated;
 
 			int min_diff = std::numeric_limits<int>().max();
@@ -379,7 +373,6 @@ int main()
 			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(5, 5));
 			cv::dilate(suit_eroded, suit_dilated, element);
 
-			std::cout << "Hello!";
 			std::vector<std::vector<cv::Point>> suit_contours;
 			cv::findContours(suit_dilated, suit_contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 
@@ -409,7 +402,6 @@ int main()
 
 			// Final suit 
 			bounded_suit = ~bounded_suit;
-			cv::imshow("Bounded Rank: " + std::to_string(i++), bounded_suit);
 
 			// Identify rank 
 			min_diff = std::numeric_limits<int>().max();
@@ -441,17 +433,24 @@ int main()
 		}
 		pipe_out["Contours"] = contour_base.clone();
 
-		// Generate rectangle contour overlay
-		cv::Mat out;
-		cv::cvtColor(cards, out, cv::COLOR_GRAY2BGR);
+		// Generate rectangle contour 
+		cv::Mat rect_contour_base;
+		cv::cvtColor(cards, rect_contour_base, cv::COLOR_GRAY2BGR);
 
 		for (size_t i = 0; i < rect_contours.size(); i++)
 		{
-			cv::drawContours(out, rect_contours, i, cv::Scalar(0, 0, 255), 4);
-		}
-		pipe_out["Rectangle Contours"] = out.clone();
+			cv::drawContours(rect_contour_base, rect_contours, i, cv::Scalar(0, 0, 255), 2);
 
-		pipe_out["Output"] = out.clone();
+		}
+		pipe_out["Rectangle Contours"] = rect_contour_base.clone();
+
+		for (size_t i = 0; i < rect_contours.size(); i++)
+		{
+			cv::drawContours(cards_color, rect_contours, i, cv::Scalar(0, 0, 255), 2);
+
+		}
+
+		pipe_out["Output"] = cards_color.clone();
 		// Draw best match rank and suit at center of image 
 		for (size_t i = 0; i < card_images.size(); i++)
 		{
@@ -459,8 +458,14 @@ int main()
 			std::string rank_best_guess = card_best_guesses[i];
 			std::string suit_best_guess = suit_best_guesses[i];
 			
-			cv::putText(pipe_out["Output"], rank_best_guess, mid, cv::FONT_HERSHEY_COMPLEX, 1.0, CV_RGB(255, 0, 0), 2);
-			cv::putText(pipe_out["Output"], suit_best_guess, mid + cv::Point{0, 18}, cv::FONT_HERSHEY_COMPLEX, 1.0, CV_RGB(255, 0, 0), 2);
+			cv::Size rank_size = cv::getTextSize(rank_best_guess, cv::FONT_HERSHEY_COMPLEX, 1, 2, nullptr);
+			cv::Point rank_origin = cv::Point(mid.x - rank_size.width / 2, mid.y + rank_size.height / 2);
+
+			cv::Size suit_size = cv::getTextSize(suit_best_guess, cv::FONT_HERSHEY_COMPLEX, 0.75, 2, nullptr);
+			cv::Point suit_origin = cv::Point(mid.x - suit_size.width / 2, mid.y + suit_size.height / 2);
+
+			cv::putText(pipe_out["Output"], rank_best_guess, rank_origin, cv::FONT_HERSHEY_COMPLEX, 1.0, CV_RGB(0, 0, 255), 2);
+			cv::putText(pipe_out["Output"], suit_best_guess, suit_origin + cv::Point(0, 24), cv::FONT_HERSHEY_COMPLEX, 0.75, CV_RGB(0, 0, 255), 2);
 		}
 
 		// Select active stage 
@@ -481,11 +486,14 @@ int main()
 			save_image = cvui::button("Save");
 			cvui::space(10);
 
-			cvui::text("Save Current Image");
-			cvui::space(8);
-			cvui::checkbox("Live", &use_camera);
-			cvui::space(10);
-
+			if (camera_available)
+			{
+				cvui::text("Save Current Image");
+				cvui::space(8);
+				cvui::checkbox("Live", &use_camera);
+				cvui::space(10);
+			}
+			
 			cvui::text("Gaussian Configuration");
 			cvui::space(10);
 			
@@ -498,12 +506,12 @@ int main()
 			cvui::trackbar(width, &gauss_params.sigma, 0, 10, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10); // add 20px of empty space
 
-			cvui::text("Threshold Configuration");
+			/*cvui::text("Threshold Configuration");
 			cvui::space(10);
 			cvui::text("Threshold");
 			cvui::space(4);
 			cvui::trackbar(width, &threshold_params.threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
-			cvui::space(10);
+			cvui::space(10);*/
 
 			cvui::text("Canny Configuration");
 			cvui::space(10);
