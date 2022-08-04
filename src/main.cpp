@@ -1,5 +1,6 @@
 #include <iostream>
 #include <unordered_map>
+#include <array>
 
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
@@ -46,11 +47,37 @@ int main()
 	// "Frame buffer"
 	int window_height = 720;
 	int window_width = 1280;
+	cv::Size rank_size(30, 45);
 
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
 	cv::Mat source = cv::imread("cards.jpg", cv::IMREAD_GRAYSCALE);
+
+	// Load rank and suit templates
+	std::vector<std::pair<std::string, cv::Mat>> rank_images = {};
+	std::vector<std::string> rank_names = {
+		"Ace", "Two", "Three", "Four", "Five", "Six",
+		"Seven", "Eight", "Nine", "Ten", "Jack", "Queen",
+		"King"
+	};
+	for (const auto& rank: rank_names)
+	{
+		cv::Mat img = cv::imread("images/" + rank + ".png", cv::IMREAD_GRAYSCALE);
+		cv::Mat resized;
+		cv::resize(img, resized, rank_size);
+		rank_images.push_back({ rank, resized});
+	}
+
+	std::vector<std::pair<std::string, cv::Mat>> suit_images = {};
+	std::vector<std::string> suit_names = {
+		"Hearts", "Clubs", "Spades", "Diamonds"
+	};
+
+	for (const auto& suit: suit_names)
+	{
+		suit_images.push_back({suit, cv::imread("images/" + suit + ".png", cv::IMREAD_GRAYSCALE) });
+	}
 
 	// Image to display 
 	cv::Mat cards = source.clone();
@@ -219,13 +246,105 @@ int main()
 
 			std::stringstream ss; 
 			ss << "Card: " << i++;
-
-			cv::imshow(ss.str(), img);
 		}
 
 		// For each image
 		// Extract + identify rank
 
+		i = 0;
+		for (auto& img: card_images)
+		{
+			// (45,60) 2
+			// (40, 60) Q
+			// (40, 60) 10
+			// (35, 55) K 
+			// (40, 55) A
+			// (45, 55)
+			cv::Mat sub_image = img(cv::Range(10, 55), cv::Range(10, 40));
+	
+			cv::Mat blurred;
+			cv::GaussianBlur(sub_image, blurred, cv::Size(5,5), 0);
+
+			/*cv::Mat thresholded;
+			cv::adaptiveThreshold(sub_image, thresholded, 255, cv::THRESH_BINARY_INV, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 11, 10);*/
+
+			cv::Mat thresholded;
+			cv::threshold(blurred, thresholded, 200, 255, cv::THRESH_BINARY_INV);
+
+			cv::Mat eroded;
+			auto element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(5,5));
+			cv::erode(thresholded, eroded, element);
+
+			std::vector<std::vector<cv::Point>> contours; 
+			cv::findContours(eroded, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+
+			//// Bound based on centroid of the image 
+			//std::vector<cv::Moments> moments; 
+			//for (auto& c: contours)
+			//{
+			//	moments.push_back(cv::moments(c, true));
+			//}
+
+			//// Calculate centroid
+			//std::vector<cv::Point2f> centroids(contours.size());
+			//for (int i = 0; i < contours.size(); i++)
+			//{
+			//	centroids[i] = cv::Point2f(moments[i].m10 / moments[i].m00, moments[i].m01 / moments[i].m00);
+			//}
+
+			// Select largest contour
+			std::vector<cv::Point> largest_c;
+
+			float max_area = 0;
+			for (auto& c: contours)
+			{
+				float area = cv::contourArea(c);
+				if (area > max_area)
+				{
+					max_area = area;
+					largest_c = c;
+				}
+			}
+
+			// Draw bounding box of largest contour
+			cv::Rect bb = cv::boundingRect(largest_c);
+			cv::Mat base = cv::Mat::zeros(sub_image.size(), CV_8UC3);
+			for (int i = 0; i < contours.size(); i++)
+			{
+				cv::drawContours(base, contours, i, { 255, 0, 0 }, 1);
+			}
+
+			cv::Mat boundedImage(eroded, bb);
+
+			boundedImage = ~boundedImage;
+
+			std::stringstream ss;
+			ss << "Contours: " << i++;
+			cv::imshow(ss.str(), base);
+
+			int min_diff = std::numeric_limits<int>().max();
+			float max_conf = 0;
+			std::string best_match = "";
+
+			for (const auto& img: rank_images)
+			{
+				cv::Mat diff_image; 
+				cv::Mat tem;
+				cv::resize(img.second, tem, boundedImage.size());
+				cv::absdiff(boundedImage, tem, diff_image);
+				int avg_diff = cv::sum(diff_image)[0] / 255;
+				if (avg_diff < min_diff)
+				{
+					min_diff = avg_diff;
+					best_match = img.first;
+				}	
+			}
+
+			ss.clear();
+			ss << "Rank: " << best_match << i++ << " " << max_conf;
+
+			cv::imshow(ss.str(), boundedImage);
+		}
 
 		// Select active stage 
 		active_stage = stage_titles[active_image_index];
