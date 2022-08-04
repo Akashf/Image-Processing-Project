@@ -95,27 +95,48 @@ int main()
 
 	// Threshold
 	ThresholdParameters threshold_params;
-
-	int active_image_index = 0;
-	std::string active_stage = "Blurred";
 	
-	// Create a settings window using the EnhancedWindow class.
-	// int x, int y, int width, int height, const cv::String& title, bool minimizable = true, double theFontScale = cvui::DEFAULT_FONT_SCALE
+	// Create windows
 	EnhancedWindow settings(0, 0, 320, window_height, "Settings");
 	EnhancedWindow image(settings.width(), 0, cards_color.cols + 20, cards_color.rows + 40, "Active Image");
-	int image_width = cards_color.cols;
-	int image_height = cards_color.rows;
-	double scale = 1.0;
+	EnhancedWindow sub_image(settings.width(), window_height - 500, 350, 500, "Individual Card View");
 
-	// Init cvui and tell it to create a OpenCV window, i.e. cv::namedWindow(WINDOW_NAME).
-	cvui::init(WINDOW_NAME);
-	cv::Mat new_cards;
-	auto time = std::chrono::high_resolution_clock::now();
+	// Create image stores
+	std::vector<std::string> sub_stage_titles = {
+		"Warped",
+		"Rank",
+		"Rank Threshold",
+		"Rank Dilated",
+		"Rank Contours",
+		"Rank Bounded",
+		"Suit",
+		"Suit Threshold",
+		"Suit Dilated",
+		"Suit Eroded",
+		"Suit Contours",
+		"Suit Bounded",
+	};
+
+	std::unordered_map<std::string, cv::Mat> card_img_data = {
+		{ "Warped", cv::Mat::zeros(10, 10, CV_8UC3) },
+		{ "Rank", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Rank Thresholded", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Rank Dilated", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Rank Contours", cv::Mat::zeros(10, 10, CV_8UC3)},
+		{ "Rank Bounded", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Rank Final", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Suit", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Suit Thresholded", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Suit Eroded", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Suit Dilated", cv::Mat::zeros(10, 10, CV_8UC1)},
+		{ "Suit Countours", cv::Mat::zeros(10, 10, CV_8UC3)},
+		{ "Suit Bounded", cv::Mat::zeros(10, 10, CV_8UC1)}
+	};
 
 	std::vector<std::string> stage_titles = {
 		"Source",
 		"Blurred",
-		// "Equalized",
+		"Equalized",
 		"Edges",
 		"Contours",
 		"Rectangle Contours",
@@ -123,7 +144,7 @@ int main()
 	};
 
 	std::unordered_map<std::string, cv::Mat> pipe_out = {
-		{"Source", cv::Mat()},
+		{"Source", cv::Mat::zeros(10, 10, CV_8UC1)},
 		{"Blurred", cv::Mat()},
 		{"Equalized", cv::Mat()},
 		{"Binarized", cv::Mat()},
@@ -133,24 +154,39 @@ int main()
 		{"Output", cv::Mat()},
 	};
 
-	std::string best_match = "";
-
-	cv::Mat display_image; 
+	// Operating data
+	// Main window
+	int active_image_index = 0;
+	std::string active_stage = "Source";
 	bool save_image = false;
+	cv::Mat cards;
+	cv::Mat display_image;
+
+	// Sub window
+	int active_card_index = 0;
+	int active_substage_index = 0;
+	std::string active_substage = "Warped";
+	cv::Mat sub_display_image; 
+
+	// Configure web cam parameters 
 	cv::Mat cam_frame; 
 	cv::VideoCapture camera(0);
-
 	bool camera_available = true;
+	bool use_camera = true;
 	if (!camera.isOpened())
 	{
 		std::cout << "Cannot connect to camera";
 		camera_available = false;
 	}
+	
+	// Init cvui and tell it to create a OpenCV window, i.e. cv::namedWindow(WINDOW_NAME).
+	cvui::init(WINDOW_NAME);
+	auto time = std::chrono::high_resolution_clock::now();
 
-	bool use_camera = false;
-	cv::Mat cards;
 	while (true) 
 	{
+		std::vector<std::unordered_map<std::string, cv::Mat>> card_data = {};
+
 		// FPS Tracking 
 		auto now = std::chrono::high_resolution_clock::now();
 		auto time_delta = now - time;
@@ -279,25 +315,43 @@ int main()
 
 		// Extract + identify rank
 		i = 0;
+		int image_index = 0;
 		for (auto& img: card_images)
 		{
+			// Initialize card data for viewer
+			card_data.push_back(card_img_data);
+			std::string best_match = "";
+
+			// Add warped image result
+			auto& card_map = card_data[image_index];
+			// card_map["Warped"] = img;
+			
 			// Extract + Identify Rank
-			cv::Mat rank_image = img(cv::Range(0, 55), cv::Range(0, 40));
+			cv::Rect rank_bounding_box(0, 0, 35, 55);
+			cv::Mat rank_image = img(rank_bounding_box);
+			
+			// Draw bounding box on card
+			cv::Mat card_img_color;
+			cv::cvtColor(img, card_img_color, cv::COLOR_GRAY2BGR);
+			cv::rectangle(card_img_color, rank_bounding_box, CV_RGB(0, 0, 255), 1);
+
+			card_map["Rank"] = rank_image;
 	
 			cv::Mat rank_thresholded;
 			cv::threshold(rank_image, rank_thresholded, 150, 255, cv::THRESH_OTSU);
+			card_map["Rank Threshold"] = rank_thresholded.clone();
 			rank_thresholded = ~rank_thresholded;
 
 			cv::Mat rank_dilated;
 			auto element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(4,4));
 			cv::dilate(rank_thresholded, rank_dilated, element);
+			card_map["Rank Dilated"] = ~rank_dilated;
 
 			std::vector<std::vector<cv::Point>> contours; 
 			cv::findContours(rank_dilated, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 
 			// Select largest contour
 			std::vector<cv::Point> largest_c;
-
 			float max_area = 0;
 			for (auto& c: contours)
 			{
@@ -311,35 +365,43 @@ int main()
 
 			// Draw bounding box of largest contour
 			cv::Rect bb = cv::boundingRect(largest_c);
-			cv::Mat base = cv::Mat::zeros(rank_image.size(), CV_8UC3);
-			for (int i = 0; i < contours.size(); i++)
+
+			// Draw contours
+			cv::Mat rank_contour_base; 
+			cv::cvtColor(~rank_dilated, rank_contour_base, cv::COLOR_GRAY2BGR);
+
+			if (!rank_contour_base.empty())
 			{
-				cv::drawContours(base, contours, i, { 255, 0, 0 }, 1);
+				for (int i = 0; i < contours.size(); i++)
+				{
+					cv::drawContours(rank_contour_base, contours, i, { 255, 0, 0 }, 1);
+				}
 			}
+			
+			card_map["Rank Contours"] = rank_contour_base;
 
 			cv::Mat bounded_rank = cv::Mat::zeros(rank_image.size(), CV_8UC1);
 			if (!largest_c.empty())
 			{
 				bounded_rank = rank_dilated(bb);
 			}
+			card_map["Rank Bounded"] = ~bounded_rank;
 
-			cv::Mat bounded_eroded = cv::Mat::zeros(bounded_rank.size(), CV_8UC1);
-			auto element1 = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(8, 8));
-			cv::erode(bounded_rank, bounded_eroded, element1);
+	/*		cv::Mat bounded_eroded = cv::Mat::zeros(bounded_rank.size(), CV_8UC1);
+			auto rank_erode_element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(4, 4));
+			cv::erode(bounded_rank, bounded_eroded, rank_erode_element);
+			card_map["Rank Bounded Eroded"] = ~bounded_eroded;
 			
 			cv::Mat bounded_dilated;
 			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(8, 8));
-			cv::dilate(bounded_eroded, bounded_dilated, element1);
+			cv::dilate(bounded_eroded, bounded_dilated, rank_erode_element);
+			card_map["Rank Bounded Dilated"] = ~bounded_dilated;*/
 
-			bounded_dilated = ~bounded_dilated;
-			bounded_rank = ~bounded_rank;
-			bounded_eroded = ~bounded_eroded;
-
-			cv::Mat rank_identity = bounded_dilated;
+			cv::Mat rank_identity = ~bounded_rank;
+			card_map["Rank Final"] = rank_identity;
 
 			int min_diff = std::numeric_limits<int>().max();
 			float max_conf = 0;
-	
 			for (const auto& img: rank_images)
 			{
 				cv::Mat diff_image; 
@@ -358,21 +420,29 @@ int main()
 			ss << "Rank Best Guess: " << best_match;
 			card_best_guesses.push_back(best_match);
 		
+			cv::Rect suit_bounding_box(0, 55, 35, 45);
+			cv::rectangle(card_img_color, suit_bounding_box, CV_RGB(0, 255, 0), 1);
+			card_map["Warped"] = card_img_color;
+
 			// Extract + Identify Suit 
-			cv::Mat suit_image = img(cv::Range(55, 100), cv::Range(0, 40));
+			cv::Mat suit_image = img(suit_bounding_box);
+			card_map["Suit"] = suit_image;
 		
 			cv::Mat suit_thresholded; 
 			cv::threshold(suit_image, suit_thresholded, 120, 255, cv::THRESH_OTSU);
+			card_map["Suit Threshold"] = suit_thresholded.clone();
 			suit_thresholded = ~suit_thresholded;
+		
+			// Closing op for cutoff club stems
+			cv::Mat suit_dilated;
+			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+			cv::dilate(suit_thresholded, suit_dilated, element);
+			card_map["Suit Dilated"] = ~suit_dilated;
 
 			cv::Mat suit_eroded;
-			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(5, 5));
-			cv::erode(suit_thresholded, suit_eroded, element);
+			cv::erode(suit_dilated, suit_eroded, element);
+			card_map["Suit Eroded"] = ~suit_eroded;
 			
-			cv::Mat suit_dilated;
-			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(5, 5));
-			cv::dilate(suit_eroded, suit_dilated, element);
-
 			std::vector<std::vector<cv::Point>> suit_contours;
 			cv::findContours(suit_dilated, suit_contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 
@@ -394,14 +464,29 @@ int main()
 				suit_bb = cv::boundingRect(largest_contour);
 			}
 
+			// Draw suit contours
+			cv::Mat suit_contour_img;
+			cv::cvtColor(~suit_dilated, suit_contour_img, cv::COLOR_GRAY2BGR);
+
+			if (!suit_contour_img.empty())
+			{
+				for (int i = 0; i < suit_contours.size(); i++)
+				{
+					cv::drawContours(suit_contour_img, suit_contours, i, { 255, 0, 0 }, 1);
+				}
+			}
+			
+			card_map["Suit Contours"] = suit_contour_img;
+
 			cv::Mat bounded_suit = suit_dilated.clone();
 			if (!suit_bb.empty())
 			{
 				bounded_suit = suit_dilated(suit_bb);
 			}
-
+			
 			// Final suit 
 			bounded_suit = ~bounded_suit;
+			card_map["Suit Bounded"] = bounded_suit;
 
 			// Identify rank 
 			min_diff = std::numeric_limits<int>().max();
@@ -421,6 +506,7 @@ int main()
 			}
 
 			suit_best_guesses.push_back(suit_match);
+			image_index++;
 		}
 
 		// Generate original contour overlay
@@ -472,13 +558,37 @@ int main()
 		active_stage = stage_titles[active_image_index];
 		display_image = pipe_out[active_stage];
 
+		// Select active sub image stage
+		active_substage = sub_stage_titles[active_substage_index];
+		if (card_data.empty())
+		{
+			sub_display_image = cv::Mat::zeros(sub_image.heightWithoutBorders(), sub_image.widthWithoutBorders(), CV_8UC3);
+		}
+		else
+		{
+			active_card_index = active_card_index > card_data.size() - 1 ? card_data.size() - 1 : active_card_index;
+			sub_display_image = card_data[active_card_index][active_substage];
+		}
+		
 		// Render the settings window and its content, if it is not minimized.
 		settings.begin(frame);
 		if (!settings.isMinimized()) 
 		{
 			int width = 300;
 			cvui::text("Pipeline Stage - " + active_stage);
-			cvui::trackbar(width, &active_image_index, 0, (int)stage_titles.size() - 1, 1, "%0.1d", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar(width, &active_image_index, 0, (int)stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::space(10);
+
+			// Hanging 
+			if (card_data.size() > 1)
+			{
+				cvui::text("Active Card - " + std::to_string(active_card_index));
+				cvui::trackbar(width, &active_card_index, 0, (int)card_data.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+				cvui::space(10);
+			}
+			
+			cvui::text("Suit/Rank Stage - " + active_substage);
+			cvui::trackbar(width, &active_substage_index, 0, (int)sub_stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 
 			cvui::text("Save Current Image");
@@ -490,7 +600,14 @@ int main()
 			{
 				cvui::text("Save Current Image");
 				cvui::space(8);
-				cvui::checkbox("Live", &use_camera);
+				static bool old = use_camera;
+				static bool current = old;
+				current = cvui::checkbox("Live", &use_camera);
+				if (current != old)
+				{
+					active_card_index = 0;
+					old = current;;
+				}
 				cvui::space(10);
 			}
 			
@@ -538,9 +655,31 @@ int main()
 			{
 				cv::cvtColor(display_image, disp, cv::COLOR_GRAY2BGR);
 			}
+			// Check image type 
+
 			cvui::image(disp);
 		}
 		image.end();
+
+		sub_image.begin(frame);
+		if (!sub_image.isMinimized())
+		{
+			cv::Mat disp; 
+			if (card_data.empty())
+			{
+				disp = sub_display_image;
+			}
+			else if (active_substage == "Suit Contours" || active_substage == "Rank Contours" || active_substage == "Warped")
+			{
+				disp = sub_display_image;
+			}
+			else
+			{
+				cvtColor(sub_display_image, disp, cv::COLOR_GRAY2BGR);
+			}
+			cvui::image(disp);
+		}
+		sub_image.end();
 
 		// Update all cvui internal stuff, e.g. handle mouse clicks, and show
 		// everything on the screen.
