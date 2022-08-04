@@ -159,6 +159,7 @@ int main()
 	int active_image_index = 0;
 	std::string active_stage = "Source";
 	bool save_image = false;
+	bool save_subimage = false;
 	cv::Mat cards;
 	cv::Mat display_image;
 
@@ -570,6 +571,14 @@ int main()
 			active_card_index = active_card_index > card_data.size() - 1 ? card_data.size() - 1 : active_card_index;
 			sub_display_image = card_data[active_card_index][active_substage];
 		}
+
+		if (save_subimage)
+		{
+			std::stringstream ss;
+			ss << "card_" << active_card_index << "_stage_" << active_substage << ".png";
+			cv::imwrite(ss.str(), sub_display_image);
+			save_subimage = false;
+		}
 		
 		// Render the settings window and its content, if it is not minimized.
 		settings.begin(frame);
@@ -592,9 +601,14 @@ int main()
 			cvui::trackbar(width, &active_substage_index, 0, (int)sub_stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 
-			cvui::text("Save Current Image");
+			cvui::text("Save Active Image");
 			cvui::space(8);
 			save_image = cvui::button("Save");
+			cvui::space(10);
+
+			cvui::text("Save Card View");
+			cvui::space(8);
+			save_subimage = cvui::button("Save");
 			cvui::space(10);
 
 			if (camera_available)
