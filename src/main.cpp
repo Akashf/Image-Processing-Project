@@ -192,8 +192,9 @@ int main()
 		auto time_delta = now - time;
 		time = now;
 		auto frame_time = std::chrono::duration_cast<std::chrono::microseconds>(time_delta).count() / 1000.0;
-		std::cout << "Frame time (ms): " << frame_time << "\n";
-	
+		std::cout << "Frame time (ms): " << frame_time << " | "
+				  << "FPS(): " << 1.0 / (frame_time / 1000) << "\n";
+
 		// Read image from camera
 		if (use_camera)
 		{
