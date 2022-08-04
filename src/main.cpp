@@ -21,8 +21,8 @@
 
 struct CannyParameters
 {
-	int low_threshold = 50;
-	int high_threshold = 150;
+	int low_threshold = 0;
+	int high_threshold = 255;
 };
 
 struct GaussianParameters
@@ -52,7 +52,7 @@ int main()
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
-	cv::Mat source = cv::imread("cards-scuffed.jpg", cv::IMREAD_GRAYSCALE);
+	cv::Mat source = cv::imread("cards-numerous.jpg", cv::IMREAD_GRAYSCALE);
 
 	// Load rank and suit templates
 	std::vector<std::pair<std::string, cv::Mat>> rank_images = {};
@@ -128,6 +128,8 @@ int main()
 		{"Contours", cv::Mat()},
 	};
 
+	std::string best_match = "";
+
 	cv::Mat display_image; 
 	bool save_image = false;
 	while (true) 
@@ -141,7 +143,6 @@ int main()
 	
 		// Clear background color
 		frame = cv::Scalar(53, 101, 77);
-
 		if (save_image)
 		{
 			cv::imwrite("image_out.png", pipe_out[active_stage]);
@@ -159,7 +160,7 @@ int main()
 		cv::GMat g_in;
 		cv::GMat g_blurred = cv::gapi::gaussianBlur(g_in, { gauss_params.kernel_size, gauss_params.kernel_size }, gauss_params.sigma);
 		cv::GMat g_equalized = cv::gapi::equalizeHist(g_blurred);
-		cv::GMat g_edges = cv::gapi::Canny(g_equalized, canny_params.low_threshold, canny_params.high_threshold);
+		cv::GMat g_edges = cv::gapi::Canny(g_blurred, canny_params.low_threshold, canny_params.high_threshold);
 		cv::GArray<cv::GArray<cv::Point>> g_contours = cv::gapi::findContours(g_edges, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 		cv::GComputation pipeline(cv::GIn(g_in), cv::GOut(g_blurred, g_equalized, g_edges, g_contours));
 	
@@ -178,16 +179,21 @@ int main()
 		);
 
 		// Generate contour overlay
-		cv::Mat contour_base = cv::Mat::zeros(cards.size(), CV_8UC3);
+		cv::Mat contour_base;
+		cv::cvtColor(cards, contour_base, cv::COLOR_GRAY2BGR);
+
 		for (size_t i = 0; i < contours.size(); i++)
 		{
-			cv::drawContours(contour_base, contours, i, cv::Scalar(255, 0, 0), 1);
+			cv::drawContours(contour_base, contours, i, cv::Scalar(0, 0, 255), 4);
 		}
 		pipe_out["Contours"] = contour_base.clone();
 
 		
 		std::vector<cv::Rect> boundRect(contours.size());
 		std::vector<cv::Mat> card_images = {};
+		std::vector<cv::Point> card_midpoints = {};
+		std::vector<std::string> card_best_guesses = {};
+		std::vector<std::string> suit_best_guesses = {};
 		std::vector<cv::Point2f> target_pts = {{0, 0}, {0, 349}, {249, 349}, {249, 0}};
 
 		size_t i = 0;
@@ -209,6 +215,7 @@ int main()
 				y_sum += p.y;
 			}
 			cv::Point2f mid(x_sum / 4, y_sum / 4);
+			card_midpoints.push_back(mid);
 
 			// Determine semantic location of this point in image
 			std::vector<cv::Point2f> src(4);
@@ -247,52 +254,30 @@ int main()
 			std::stringstream ss; 
 			ss << "Card: " << i++;
 
-			cv::imshow(ss.str(), img);
+			if (i < 8)
+			{
+				cv::imshow(ss.str(), img);
+			}
 		}
 
-		// For each image
+		
 		// Extract + identify rank
-
 		i = 0;
 		for (auto& img: card_images)
 		{
-			// (45,60) 2
-			// (40, 60) Q
-			// (40, 60) 10
-			// (35, 55) K 
-			// (40, 55) A
-			// (45, 55)
-			cv::Mat sub_image = img(cv::Range(10, 55), cv::Range(10, 40));
+			// Extract + Identify Rank
+			cv::Mat rank_image = img(cv::Range(0, 55), cv::Range(0, 40));
 	
-			cv::Mat blurred;
-			cv::GaussianBlur(sub_image, blurred, cv::Size(5,5), 0);
+			cv::Mat rank_thresholded;
+			cv::threshold(rank_image, rank_thresholded, 150, 255, cv::THRESH_OTSU);
+			rank_thresholded = ~rank_thresholded;
 
-			/*cv::Mat thresholded;
-			cv::adaptiveThreshold(sub_image, thresholded, 255, cv::THRESH_BINARY_INV, cv::ADAPTIVE_THRESH_GAUSSIAN_C, 11, 10);*/
-
-			cv::Mat thresholded;
-			cv::threshold(blurred, thresholded, 200, 255, cv::THRESH_BINARY_INV);
-
-			cv::Mat eroded;
-			auto element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(5,5));
-			cv::erode(thresholded, eroded, element);
+			cv::Mat rank_dilated;
+			auto element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(4,4));
+			cv::dilate(rank_thresholded, rank_dilated, element);
 
 			std::vector<std::vector<cv::Point>> contours; 
-			cv::findContours(eroded, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
-
-			//// Bound based on centroid of the image 
-			//std::vector<cv::Moments> moments; 
-			//for (auto& c: contours)
-			//{
-			//	moments.push_back(cv::moments(c, true));
-			//}
-
-			//// Calculate centroid
-			//std::vector<cv::Point2f> centroids(contours.size());
-			//for (int i = 0; i < contours.size(); i++)
-			//{
-			//	centroids[i] = cv::Point2f(moments[i].m10 / moments[i].m00, moments[i].m01 / moments[i].m00);
-			//}
+			cv::findContours(rank_dilated, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 
 			// Select largest contour
 			std::vector<cv::Point> largest_c;
@@ -310,30 +295,42 @@ int main()
 
 			// Draw bounding box of largest contour
 			cv::Rect bb = cv::boundingRect(largest_c);
-			cv::Mat base = cv::Mat::zeros(sub_image.size(), CV_8UC3);
+			cv::Mat base = cv::Mat::zeros(rank_image.size(), CV_8UC3);
 			for (int i = 0; i < contours.size(); i++)
 			{
 				cv::drawContours(base, contours, i, { 255, 0, 0 }, 1);
 			}
 
-			cv::Mat boundedImage(eroded, bb);
+			cv::Mat bounded_rank(rank_dilated, bb);
 
-			boundedImage = ~boundedImage;
+			cv::Mat bounded_eroded;
+			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(8, 8));
+			cv::erode(bounded_rank, bounded_eroded, element);
+			
+			cv::Mat bounded_dilated;
+			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(8, 8));
+			cv::dilate(bounded_eroded, bounded_dilated, element);
 
-			std::stringstream ss;
-			ss << "Contours: " << i++;
-			// cv::imshow(ss.str(), base);
+			bounded_dilated = ~bounded_dilated;
+			bounded_rank = ~bounded_rank;
+			bounded_eroded = ~bounded_eroded;
+
+
+
+			cv::imshow("Bounded Rank: " + std::to_string(i++), bounded_dilated);
+			cv::imshow("Bounded Rank: " + std::to_string(i++), bounded_rank);
+
+			cv::Mat rank_identity = bounded_dilated;
 
 			int min_diff = std::numeric_limits<int>().max();
 			float max_conf = 0;
-			std::string best_match = "";
-
+	
 			for (const auto& img: rank_images)
 			{
 				cv::Mat diff_image; 
 				cv::Mat tem;
-				cv::resize(img.second, tem, boundedImage.size());
-				cv::absdiff(boundedImage, tem, diff_image);
+				cv::resize(img.second, tem, rank_identity.size());
+				cv::absdiff(rank_identity, tem, diff_image);
 				int avg_diff = cv::sum(diff_image)[0] / 255;
 				if (avg_diff < min_diff)
 				{
@@ -342,10 +339,76 @@ int main()
 				}	
 			}
 
-			ss.clear();
-			ss << "Rank: " << best_match << " " << i++;
+			std::stringstream ss;
+			ss << "Rank Best Guess: " << best_match;
+			card_best_guesses.push_back(best_match);
+		
+			// Extract + Identify Suit 
+			cv::Mat suit_image = img(cv::Range(55, 100), cv::Range(0, 40));
+		
+			cv::Mat suit_thresholded; 
+			cv::threshold(suit_image, suit_thresholded, 120, 255, cv::THRESH_OTSU);
+			suit_thresholded = ~suit_thresholded;
 
-			// cv::imshow(ss.str(), boundedImage);
+			cv::Mat suit_dilated;
+			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(4, 4));
+			cv::dilate(suit_thresholded, suit_dilated, element);
+
+			std::vector<std::vector<cv::Point>> suit_contours;
+			cv::findContours(suit_dilated, suit_contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+
+			// Calculate bb of largest area contour
+			cv::Rect suit_bb; 
+			{
+				std::vector<cv::Point> largest_contour;
+
+				float max_area = 0;
+				for (auto& c : suit_contours)
+				{
+					float area = cv::contourArea(c);
+					if (area > max_area)
+					{
+						max_area = area;
+						largest_contour = c;
+					}
+				}
+				suit_bb = cv::boundingRect(largest_contour);
+			}
+
+			cv::Mat bounded_suit = suit_dilated(suit_bb);
+
+			// Final suit 
+			bounded_suit = ~bounded_suit;
+
+			// Identify rank 
+			min_diff = std::numeric_limits<int>().max();
+			std::string suit_match = "";
+			for (const auto& img : suit_images)
+			{
+				cv::Mat diff_image;
+				cv::Mat tem;
+				cv::resize(img.second, tem, bounded_suit.size());
+				cv::absdiff(bounded_suit, tem, diff_image);
+				int avg_diff = cv::sum(diff_image)[0] / 255;
+				if (avg_diff < min_diff)
+				{
+					min_diff = avg_diff;
+					suit_match = img.first;
+				}
+			}
+
+			suit_best_guesses.push_back(suit_match);
+		}
+
+		// Draw best match rank and suit at center of image 
+		for (size_t i = 0; i < card_images.size(); i++)
+		{
+			auto mid = card_midpoints[i];
+			std::string rank_best_guess = card_best_guesses[i];
+			std::string suit_best_guess = suit_best_guesses[i];
+			
+			cv::putText(pipe_out["Contours"], rank_best_guess, mid, cv::FONT_HERSHEY_COMPLEX, 1.0, CV_RGB(255, 0, 0), 2);
+			cv::putText(pipe_out["Contours"], suit_best_guess, mid + cv::Point{0, 18}, cv::FONT_HERSHEY_COMPLEX, 1.0, CV_RGB(255, 0, 0), 2);
 		}
 
 		// Select active stage 

@@ -61,10 +61,10 @@ public:
 
 		} else {
 			mIsMoving = false;
-			mX = std::max(0, mX);
-			mY = std::max(0, mY);
-			mX = std::min(frame.cols - mWidth, mX);
-			mY = std::min(frame.rows - scaledTitleHeight, mY);
+			//mX = std::max(0, mX);
+			//mY = std::max(0, mY);
+			//mX = std::min(frame.cols - mWidth, mX);
+			//mY = std::min(frame.rows - scaledTitleHeight, mY);
 		}
 
 		cvui::window(frame, mX, mY, mWidth, mHeight, mTitle, mFontScale);
