@@ -118,9 +118,33 @@ contours we could approximate the corners of the card and them use them for a pe
 that we could have a flat card of the same everytime to use our bounding boxes on the rank and type.
 
 \section{Results}
-The resulting application for detecting cards and their type works better than expected
+The resulting application for detecting cards and their type works better than expected however
+there are still limitations to it's use.
 
+\subsection{Limitations}
+These are the following limitations that were found with the current application:
+\begin{itemize}
+\item Calibrated to a specific card pack. Other card packs do not recieve the same amount of correct
+        rank and suit estemates.
+\item The entire card must be on the image being processed. If Even a tiny bit is cut off the
+        detection will fail. This also holds true for overlapping cards; therefore, cards must not
+        overlap each other (which is extremely common in card games).
+\item The rotation of the card on the page must be within 45 deg from upright. The matching of the
+        corners to the perspective transform is based of the position of the corner relative to the
+        cards center point. Therefore an upside down card is fine due to the nature of the card
+        descriptions on both top left corners. So there is about 180 deg discontinuous position
+        where the detection will work.
+\item Bright shining lights that reflect off the card can wash out key features that are used to
+        detect the card, while still being readable to humans.
+\end{itemize}
 
+Probably place some example images here for when things don't work.
+
+% \begin{figure}[htbp]
+% \centerline{\includegraphics{fig1.png}}
+% \caption{GUI for card identifier program using cvui Library.}
+% \label{fig:gui}
+% \end{figure}
 
 \subsection{Necessary Changes}
 
@@ -129,16 +153,6 @@ The limitations with our application are: the cards must not overlap and must no
 from the frame. It detects the card within 
 
 \section{Ease of Use}
-
-\subsection{Maintaining the Integrity of the Specifications}
-
-The IEEEtran class file is used to format your paper and style the text. All margins, 
-column widths, line spaces, and text fonts are prescribed; please do not 
-alter them. You may note peculiarities. For example, the head margin
-measures proportionately more than is customary. This measurement 
-and others are deliberate, using specifications that anticipate your paper 
-as one part of the entire proceedings, and not as an independent document. 
-Please do not revise any of the current designations.
 
 \section{Prepare Your Paper Before Styling}
 Before you begin to format your paper, first write and save the content as a 
