@@ -14,10 +14,14 @@
 \usepackage{xcolor}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\graphicspath{ {./images/} }
+
+
 \begin{document}
 
-\title{ECE 7600 Intro to Digital Signal Processing Final Project: Card Detection and Identification
-using Image Processing
+\title{ECE 7600 Intro to Digital Signal Processing Final Project:
+Card Detection and Identification using Image Processing
 }
 
 \author{\IEEEauthorblockN{Akash Fiech (201754892)}
@@ -42,7 +46,7 @@ csmith@mun.ca
 \end{abstract}
 
 \begin{IEEEkeywords}
-image processing, cards, OpenCV
+image processing, cards, OpenCV, C++
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -109,6 +113,16 @@ greatly improved development time as we could debug different parameters in real
 
 
 \subsection{Final Implementation}
+
+\subsubsection{Environmental Assuptions} % This seams to the same as issues
+The final implementation made some assumptions on how the cards would be presented, these were as
+follows:
+\begin{itemize}
+    \item The cards are placed on a darker uniform background, so the white background of the cards
+        don't clash with the surface.
+\end{itemize}
+
+
 \subsubsection{Encountered Issues}
 The key issues encountered while programming the application was the detection of the card border.
 Once this preprocessing was done to the image and the edge detection was run, the contours were
@@ -118,9 +132,43 @@ inconsequential at this stage. This allowed us to get a nice contour of the card
 contours we could approximate the corners of the card and them use them for a perspective change so
 that we could have a flat card of the same everytime to use our bounding boxes on the rank and type.
 
+Once we got the contours of the card it is necessary to then perspective shift it to a known size so
+that we can hardcode locations for the rank and suit. The corners of the card were estimated using
+the contours, however the points need to then be mapped to the perspective shifted image in a manor
+that provides the scaled image of a card with the suit and rank information at the top left corner.
+The perspective shift introduced a tradeoff issue; account for all rotations at the cost of
+development time. We chose a custom method where the center of the card was found and used as the
+origin of a graph, and then assumed the corner point in Quadrant 2 to be top left, point in Quadrant
+1 to be top right, and so on (Figure \ref{fig:graph}). Since we do not care if the card is upside
+down this allows for about 180 deg of card position that will work with the model.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics{graph-quadrants.png}}
+\caption{Quadrents of a graph}
+\label{fig:graph}
+\end{figure}
+
+% Since the rank and suit images (identifier images) were hardcoded from the scaled card image, there is deviation present
+% in the identifier images the absolute difference for matching against the identifier template would
+% also be inconsistent. Therefore further processing was done 
+
+The output of the preprocessed rank and suit images (identifier images) were matched against a
+template image of the rank and suit that was found online. Initially this provided extremely poor
+matching; therefore, images were taken of all the necessary identifiers and then by hand cropped and
+thresholded into a custom identifier image. This greatly improved performace for our card deck, with
+the downside that it is only calibrated for a single deck of cards.
+
 \section{Results}
 The resulting application for detecting cards and their type works better than expected however
 there are still limitations to it's use.
+
+\section{Computational Performance}
+The intial benchmark that we set for our programs computational performace was around 5 frames per
+second (fps), this is the speed that we observed in other usable implementations
+\cite{opencv-card-detection} (this was obviously running on a Raspberry Pi 3, therefore performace
+is expected to be lower). Our implementations general speed was around 20 fps (With 1 card on
+screen); this was better than expected. Even with a arguably inefficient gui library written using
+Opencv (cvui), we were able to 
 
 \subsection{Limitations}
 These are the following limitations that were found with the current application:
@@ -169,6 +217,15 @@ definetly improve upon the speed. Currently the base CPU implementation for Open
 image processing; this could be changed to use the OpenCV CUDA or OpenCV backend. This would greatly
 improve speed as the amount of parallel instructions running would drastically increase.
 
+\section{Conclusions}
+The implementation of playing card detection and identification using image processing and OpenCV
+was a great learning experience. We were able to test our fundamental knowledge of image processing
+and learn a bit beyond what we were taught in class. Overall we are happy with the outcome of our
+application; we were able to relaibly detect almost all cards. There were still cases with specific
+cards where the output would be consistently incorrect. Other than that the main issues with the
+current implementation is that there are conditions such as cut off cards, overexposed lighting,
+orientation, etc. that cause the identification of cards to fail. A couple strategies at mitegating
+these issues have also been discussed along with potential to improve computational performance.
 
 \section*{References}
 \begin{thebibliography}{00}
