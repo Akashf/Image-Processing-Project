@@ -59,6 +59,10 @@ Image Processing'' \cite{poker-vision}, and a Youtube video ``Playing Card Detec
 OpenCV-Python on the Raspberry Pi 3 + PiCamera'' \cite{opencv-card-detection}. While these
 resources were fantastic deviations were made to fit our use case and desired difficulty level.
 
+\section{Goal}
+
+\section{Prior Art}
+
 \section{Planning}
 
 \subsection{Desired Output and Interface}
@@ -114,15 +118,6 @@ greatly improved development time as we could debug different parameters in real
 
 \subsection{Final Implementation}
 
-\subsubsection{Environmental Assuptions} % This seams to the same as issues
-The final implementation made some assumptions on how the cards would be presented, these were as
-follows:
-\begin{itemize}
-    \item The cards are placed on a darker uniform background, so the white background of the cards
-        don't clash with the surface.
-\end{itemize}
-
-
 \subsubsection{Encountered Issues}
 The key issues encountered while programming the application was the detection of the card border.
 Once this preprocessing was done to the image and the edge detection was run, the contours were
@@ -148,15 +143,17 @@ down this allows for about 180 deg of card position that will work with the mode
 \label{fig:graph}
 \end{figure}
 
-% Since the rank and suit images (identifier images) were hardcoded from the scaled card image, there is deviation present
-% in the identifier images the absolute difference for matching against the identifier template would
-% also be inconsistent. Therefore further processing was done 
+% Since the rank and suit images (identifier images) were hardcoded from the scaled card image,
+% there is deviation present in the identifier images the absolute difference for matching against
+% the identifier template would also be inconsistent. Therefore further processing was done 
 
 The output of the preprocessed rank and suit images (identifier images) were matched against a
 template image of the rank and suit that was found online. Initially this provided extremely poor
 matching; therefore, images were taken of all the necessary identifiers and then by hand cropped and
 thresholded into a custom identifier image. This greatly improved performace for our card deck, with
 the downside that it is only calibrated for a single deck of cards.
+
+% Opening of the ranks on the spaced
 
 \section{Results}
 The resulting application for detecting cards and their type works better than expected however
@@ -170,7 +167,7 @@ is expected to be lower). Our implementations general speed was around 20 fps (W
 screen); this was better than expected. Even with a arguably inefficient gui library written using
 Opencv (cvui), we were able to 
 
-\subsection{Limitations}
+\section{Limitations}
 These are the following limitations that were found with the current application:
 \begin{itemize}
 \item Calibrated to a specific card pack. Other card packs do not recieve the same amount of correct
@@ -227,7 +224,6 @@ current implementation is that there are conditions such as cut off cards, overe
 orientation, etc. that cause the identification of cards to fail. A couple strategies at mitegating
 these issues have also been discussed along with potential to improve computational performance.
 
-\section*{References}
 \begin{thebibliography}{00}
 \bibitem{poker-vision} P. Martins, L. P. Reis, and L Teofilo, ``Poker Vision: Playing Cards and
     Chips Identification based on Image Processing''.
