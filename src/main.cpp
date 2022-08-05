@@ -213,7 +213,9 @@ int main()
 		frame = cv::Scalar(53, 101, 77);
 		if (save_image)
 		{
-			cv::imwrite("image_out.png", pipe_out[active_stage]);
+			std::stringstream ss;
+			ss << "base_image_stage_" << active_stage << ".png";
+			cv::imwrite(ss.str(), pipe_out[active_stage]);
 			save_image = false;
 		}
 
