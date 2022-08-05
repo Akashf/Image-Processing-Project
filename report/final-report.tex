@@ -34,7 +34,7 @@ akashf@mun.ca}
 \IEEEauthorblockA{\textit{MUN Computer Engineering} \\
 % \textit{name of organization (of Aff.)}\\
 St. John's, Canada \\
-csmith@mun.ca
+cnsmith@mun.ca
 }
 }
 
@@ -60,35 +60,124 @@ OpenCV-Python on the Raspberry Pi 3 + PiCamera'' \cite{opencv-card-detection}. W
 resources were fantastic deviations were made to fit our use case and desired difficulty level.
 
 \section{Goal}
+The goal of this project is to develop a single application that, given a controlled environment
+with a solid background and soft lighting, accurately detects the suit and rank of all playing cards
+in a top-down image that are visible, do not overlap, and are not rotated more than 45 degrees. The
+application must implement a version of the card detection pipeline defined in the paper
+\cite{poker-vision}.
+
+The application output should be the original image, with contours drawn around all cards, and the
+card identification estimate overlayed on the card.
+
+To facilitate the development of such an application, target requirements for a debug user interface
+were defined as follows:
+\begin{itemize}
+    \item Should process images from a camera live feed in real time (greater than 15 fps for a
+        single card)
+    \item Should process static images loaded from disk
+    \item Should provide views of all pipeline stages
+    \item Should allow export of all pipeline stages
+\end{itemize}
+
 
 \section{Prior Art}
+The pipeline this project looks to implement is defined by the paper ``Poker Vision: Playing Cards
+and Chips Identification based on Image Processing'' \cite{poker-vision}. To narrow the scope of the
+project, the operating criteria for the implementation was defined as a subset of the design
+described in the paper. In the Poker Agent paper, the camera was placed at the seat of a hexagonal
+poker table. In our criteria, the camera location was specified as overhead. Also, the Poker Agent
+implementation must operate correctly in the presence of a background with external contours, like a
+standard poker table with surface graphics. Our implementation must operate only in front of a solid
+background. Furthermore, the lighting conditions for the Poker Agent are entirely unspecified,
+whereas our criteria specify the controlled, even lighting.
 
-\section{Planning}
+Considering these narrowed criteria, the pipeline proposed in the paper was analyzed and design
+alterations were made where they would simplify the pipeline while not affecting its performance
+under the required operating conditions. This report outlines the similarities and differences
+between our design and that of P. Martins, L. P. Reis, and L Teofilo \cite{poker-vision}.
 
-\subsection{Desired Output and Interface}
-For the final application we wanted an application that would run real-time from a 
+Another source drawn upon throughout implementation of this project was the YouTube video ``Playing
+Card Detection Using OpenCV-Python on the Raspberry Pi 3 + PiCamera'' by Edje Electronics - an
+OpenCV card detection implemented in Python \cite{opencv-card-detection}. Although the pipeline
+design for Most Constrained Card Detector (MCCD) was based solely on the ``Poker Vision'' paper and
+Edje's YouTube video, this project provided inspiration for user interface elements and acted as a
+reference for a practical implementation of a similar image pipeline.
 
-\subsection{Image Processing Pipeline}
-\begin{itemize}
-\item Stage 1: Preprocessing
-    \begin{itemize}
-        \item Color to grayscale
-        \item Gaussian Smoothing
-        \item Linear Contrast Stretching
-    \end{itemize}
-\item Stage 2: Card Contour Detection
-    \begin{itemize}
-        \item Canny edge detection
-        \item Contour Generation
-        \item Trapezoid Filtering (Might not be necessary since we will be using a controlled
-            environment)
-    \end{itemize}
-\item Stage 3: Card Extraction
-\item Stage 4: Rank Extraction
-\item Stage 5: Rank identification
-\item Stage 6: Suit Extraction
-\item Stage 7: Suit Identification
-\end{itemize}
+
+\section{Pipeline Design}
+The pipeline design consists of two primary operations - card extraction and feature (rank, suit)
+extraction and identification, each implemented using a pipeline of elementary image processing
+operations. Figure \ref{fig:pipeline}, below illustrates the overall pipeline, from source image to
+rank and suit estimate. Note that rank and suit extraction are executed sequentially in the Poker
+Agent, but could be parallelized with ease, so they are visually represented as such.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{OverallPipeline.png}}
+\caption{Overall card detection and identification pipline.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Card Extraction Pipeline}
+
+The card extraction pipeline identifies the contour of cards in the source image and applies a
+perspective transform to extract and align them. Although our criteria require operation only under
+an overhead camera, applying a perspective transform offers a vehicle to align images vertically and
+provides an opportunity to expand our operational capabilities with low cost and complexity.
+
+The Poker Agent card extraction pipeline applies preprocessing to the source image, blurring it to
+remove noise and applying histogram equalization to contrast stretch the image. Based on the solid
+background requirement, contrast stretching will not be applied in our initial implementation. The
+blurred image will be passed to a Canny Edge Detector, to extract the edges. Using these edges, the
+external contours (not contained by other contours) of the image will be found. Next, the contours
+will be estimated with polygons and filtered. In Poker Agent, the contours are filtered solely on
+their internal angles (close to 90 are selected). Based on our constrained camera location, there is
+opportunity to concisely filter the contours based on the aspect ratio of a card. As the remaining
+contours represent the four corners of an image, the card can be extracted and warped to a birds eye
+view using a reverse perspective transform (Figure \ref{fig:pipeline-card-extract}).
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{CardExtractionActual.png}}
+\caption{Card extraction pipeline.}
+\label{fig:pipeline-card-extract}
+\end{figure}
+
+\subsection{Feature Extraction}
+As the extraction and identification pipelines for the rank and the suit are nearly identical, they
+will be referred to together. The feature image is first extracted from the card image using a
+static bounding box, as the size of the cards is static and known. Although this does reduce the
+likelihood of the pipeline working well with some card decks, many decks use a similar font face.
+After extracting the approximate image of the feature, it is blurred and binarized with adaptive
+thresholding.
+
+In Poker Agent, the next step would be to erode to “remove remaining noise”. However, we plan to
+dilate and then erode in a closing operation. The purpose of this is threefold - reconnect portions
+of ranks and suites that could be separated by noise, and to connect the digits in the character ten
+so they are treated as one symbol after we crop to the contour. The Poker Agent solves the 10
+problem using an image wide 1-pixel wide line to artificially connect the characters (Figure
+\ref{fig:pipeline-feature-extract}).
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{feature-extraction.png}}
+\caption{Feature extraction pipeline.}
+\label{fig:pipeline-feature-extract}
+\end{figure}
+
+\subsection{Featire Identification}
+To identify the feature in the image (whether it be a suit or a rank), the extracted feature image
+is compared to a set of preset templates (high detail images of all ranks and suits). In Poker
+Agent, template matching is used on a sprite map of ranks and suits. As our cards do not use the
+same font, we will generate our own set of templates. Also, instead of template matching we will be
+using a simpler approach that takes the absolute value of the difference between the feature image
+and each template, then calculates the average value of the resulting mask. The mask with the lowest
+average value will be produced by the two images that are most similar. The corresponding template
+index / name will be the output - an estimate of what feature is being processed. The simple
+“template matching” algorithm is outlined below (Figure \ref{fig:pipeline-feature-identification}).
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{FeatureIdentification.png}}
+\caption{Feature extraction pipeline.}
+\label{fig:pipeline-feature-identification}
+\end{figure}
 
 \section{Implementation}
 
@@ -192,6 +281,26 @@ video demo
 % \caption{GUI for card identifier program using cvui Library.}
 % \label{fig:gui}
 % \end{figure}
+
+\section{Practical Applications}
+Gambling is one of the most lucrative ventures on the planet - and preventing people from cheating
+is likely a top priority for most gambling corporations. Yet, many card games are ``beatable'' - black
+jack is a perfect example. Instead of security personnel monitoring the casino floor at all times,
+card detection could be used to track player statistics, their betting patterns and winnings, to
+determine whether they fit the statistical profile of a ``Cheater''.
+
+Modern poker makes extensive use of GTO, or Game Theory Optimal strategy - an umbrella term for
+poker theory founded in statistics. Bots and GTO solvers are prevalent in online poker - However
+this is also a problem in live poker. In online poker, player behavioral patterns can be monitored.
+In live poker, this is a much harder problem to solve. If a player can communicate with an external
+party with access to a solver they can cheat the house and the other players.
+
+Using image processing to detect cards on the table and monitor player behavior, casinos could
+prevent this type of cheating given a large sample size. The Poker Agent agent pipeline followed in
+this implementation of card detection is focused on the application of an autonomous poker agent.
+However, a more static application such as an overhead tracking camera mounted above the table is
+another very practical application of this tool.
+
 
 \section{Future Improvements}
 While we are happy with the state of our application we realize there is still place for
