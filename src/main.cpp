@@ -16,7 +16,7 @@
 #include "cvui.h"
 #include "EnhancedWindow.h"
 
-#define WINDOW_NAME    "CVUI Enhanced Window Component"
+#define WINDOW_NAME    "Most Constrained Card Detector"
 
 
 struct CannyParameters
@@ -25,11 +25,13 @@ struct CannyParameters
 	int high_threshold = 255;
 };
 
+
 struct GaussianParameters
 {
 	int kernel_size = 3;
 	int sigma = 0;
 };
+
 
 struct ThresholdParameters
 {
@@ -52,7 +54,7 @@ int main()
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
-	cv::Mat source = cv::imread("cards.jpg");
+	cv::Mat source = cv::imread("cards-numerous.jpg");
 
 	// Load rank and suit templates
 	std::vector<std::pair<std::string, cv::Mat>> rank_images = {};
@@ -92,9 +94,6 @@ int main()
 	CannyParameters canny_params; 
 	canny_params.low_threshold = 0;
 	canny_params.high_threshold = 255;
-
-	// Threshold
-	ThresholdParameters threshold_params;
 	
 	// Create windows
 	EnhancedWindow settings(0, 0, 320, window_height, "Settings");
@@ -326,9 +325,7 @@ int main()
 			card_data.push_back(card_img_data);
 			std::string best_match = "";
 
-			// Add warped image result
 			auto& card_map = card_data[image_index];
-			// card_map["Warped"] = img;
 			
 			// Extract + Identify Rank
 			cv::Rect rank_bounding_box(0, 0, 35, 55);
@@ -391,16 +388,6 @@ int main()
 			}
 			card_map["Rank Bounded"] = ~bounded_rank;
 
-	/*		cv::Mat bounded_eroded = cv::Mat::zeros(bounded_rank.size(), CV_8UC1);
-			auto rank_erode_element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(4, 4));
-			cv::erode(bounded_rank, bounded_eroded, rank_erode_element);
-			card_map["Rank Bounded Eroded"] = ~bounded_eroded;
-			
-			cv::Mat bounded_dilated;
-			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(8, 8));
-			cv::dilate(bounded_eroded, bounded_dilated, rank_erode_element);
-			card_map["Rank Bounded Dilated"] = ~bounded_dilated;*/
-
 			cv::Mat rank_identity = ~bounded_rank;
 			card_map["Rank Final"] = rank_identity;
 
@@ -439,7 +426,7 @@ int main()
 		
 			// Closing op for cutoff club stems
 			cv::Mat suit_dilated;
-			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(1, 1));
 			cv::dilate(suit_thresholded, suit_dilated, element);
 			card_map["Suit Dilated"] = ~suit_dilated;
 
@@ -639,13 +626,6 @@ int main()
 			cvui::space(10);
 			cvui::trackbar(width, &gauss_params.sigma, 0, 10, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10); // add 20px of empty space
-
-			/*cvui::text("Threshold Configuration");
-			cvui::space(10);
-			cvui::text("Threshold");
-			cvui::space(4);
-			cvui::trackbar(width, &threshold_params.threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
-			cvui::space(10);*/
 
 			cvui::text("Canny Configuration");
 			cvui::space(10);
