@@ -238,16 +238,8 @@ and image output for each stage.
 \end{figure}
 
 \subsection{Encountered Issues}
-The key issues encountered while programming the application was the detection of the card border.
-Once this preprocessing was done to the image and the edge detection was run, the contours were
-generated. A lot of contours would be generated, then we would filter them by determining if they
-were polygons, and also filter them based on hierarchy as the polygons detected within a card were
-inconsequential at this stage. This allowed us to get a nice contour of the card; using these
-contours we could approximate the corners of the card and them use them for a perspective change so
-that we could have a flat card of the same every time to use our bounding boxes on the rank and type.
-
 Once we got the contours of the card it is necessary to then perspective shift it to a known size so
-that we can hardcode locations for the rank and suit. The corners of the card were estimated using
+that we can hard-code locations for the rank and suit. The corners of the card were estimated using
 the contours, however the points need to then be mapped to the perspective shifted image in a manor
 that provides the scaled image of a card with the suit and rank information at the top left corner.
 The perspective shift introduced a trade-off issue; account for all rotations at the cost of
@@ -272,25 +264,62 @@ matching; therefore, images were taken of all the necessary identifiers and then
 thresholded into a custom identifier image. This greatly improved performace for our card deck, with
 the downside that it is only calibrated for a single deck of cards.
 
-% Opening of the ranks on the spaced
+After testing the implementation, spade face cards were being consistently misidentified as a
+diamond. This was caused by the dilation of the spade suit image connecting it to the border of the
+face card (Figure \ref{fig:bad-jack}).
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{bad-jack.png}}
+\caption{Misidentified jack of spades.}
+\label{fig:bad-jack}
+\end{figure}
+
+To avoid connecting these edges while maintaining the closing operation, the morphological cross was
+reduced in size from 3x3 to 2x2. Figure \ref{fig:good-jack} shows the results of this improvement.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{good-jack.png}}
+\caption{Misidentified jack of spades.}
+\label{fig:good-jack}
+\end{figure}
 
 \section{Results}
-The resulting application for detecting cards and their type works better than expected however
-there are still limitations to it's use.
+Overall the detection of cards was very accurate in the highly constrained environment. To test the
+accuracy of the implemented card detector, an entire deck of cards was tested rapidly using the live
+view. The detector was able to correctly identify all cards in the deck, provided they were rotated
+off axis minimally (less than 30 degrees to the left or right). A video was captured for posterity.
+
+As the feature extraction is the most sensitive part of the pipeline, a set of feature extraction
+pipeline stages was captured for confirmation of proper performance (Figure
+\ref{fig:rank-extraction}.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{rank-extraction.png}}
+\caption{Rank extraction examples, showing pipeline stages.}
+\label{fig:rank-extraction}
+\end{figure}
+
+ Multi-card performance accuracy was the same, other than lower frame rates (Figure \ref{fig:multi-card-image}).
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{multi-card-image.png}}
+\caption{Multi-card image card example.}
+\label{fig:multi-card-image}
+\end{figure}
+
 
 \section{Computational Performance}
-The initial benchmark that we set for our programs computational performace was around 5 frames per
-second (fps), this is the speed that we observed in other usable implementations
-\cite{opencv-card-detection} (this was obviously running on a Raspberry Pi 3, therefore performace
-is expected to be lower). Our implementations general speed was around 20 fps (With 1 card on
-screen); this was better than expected. Even with a arguably inefficient gui library written using
-Opencv (cvui), we were able to 
+The initial benchmark that we set for our programs computational performance was around 5 frames per
+second (fps), this is the speed that we observed in other usable implementations (they were running
+on a Raspberry Pi 3, therefore performance is expected to be lower) \cite{opencv-card-detection}.
+Our implementations general speed was around 20 fps (With 7 card on screen); this was better than
+expected. Even with a arguably inefficient GUI library written using Opencv (cvui), we were able to 
 
 \section{Limitations}
 These are the following limitations that were found with the current application:
 \begin{itemize}
 \item Calibrated to a specific card pack. Other card packs do not recieve the same amount of correct
-        rank and suit estemates.
+        rank and suit estimates.
 \item The entire card must be on the image being processed. If Even a tiny bit is cut off the
         detection will fail. This also holds true for overlapping cards; therefore, cards must not
         overlap each other (which is extremely common in card games).
@@ -302,15 +331,6 @@ These are the following limitations that were found with the current application
 \item Bright shining lights that reflect off the card can wash out key features that are used to
         detect the card, while still being readable to humans.
 \end{itemize}
-
-Probably place some example images here for when things don't work. Take as screen grabs from the
-video demo
-
-% \begin{figure}[htbp]
-% \centerline{\includegraphics{fig1.png}}
-% \caption{GUI for card identifier program using cvui Library.}
-% \label{fig:gui}
-% \end{figure}
 
 \section{Practical Applications}
 Gambling is one of the most lucrative ventures on the planet - and preventing people from cheating
@@ -330,7 +350,6 @@ prevent this type of cheating given a large sample size. The Poker Agent agent p
 this implementation of card detection is focused on the application of an autonomous poker agent.
 However, a more static application such as an overhead tracking camera mounted above the table is
 another very practical application of this tool.
-
 
 \section{Future Improvements}
 While we are happy with the state of our application we realize there is still place for
