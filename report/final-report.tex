@@ -20,19 +20,17 @@
 
 \begin{document}
 
-\title{ECE 7600 Intro to Digital Signal Processing Final Project:
+\title{ECE 7600 Final Project:
 Card Detection and Identification using Image Processing
 }
 
 \author{\IEEEauthorblockN{Akash Fiech (201754892)}
 \IEEEauthorblockA{\textit{MUN Computer Engineering} \\
-% \textit{name of organization (of Aff.)}\\
 St. John's, Canada \\
 akashf@mun.ca}
 \and
 \IEEEauthorblockN{Colton Neal Smith (201819604)}
 \IEEEauthorblockA{\textit{MUN Computer Engineering} \\
-% \textit{name of organization (of Aff.)}\\
 St. John's, Canada \\
 cnsmith@mun.ca
 }
@@ -41,8 +39,9 @@ cnsmith@mun.ca
 \maketitle
 
 \begin{abstract}
-    This project was an implementation of a playing card identification system with image processing
-    using OpenCV.
+    A card detection and identification system using image processing was implemented. The
+    application was implemented using OpenCV's native C++ framework. The implementation functioned
+    well in a constrained environment, with controlled lighting and low background noise.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -50,14 +49,15 @@ image processing, cards, OpenCV, C++
 \end{IEEEkeywords}
 
 \section{Introduction}
-The goal of this project was to implement some form of well documented image processing procedure.
-We chose to do playing card detection and classification for our project, this allowed us to use
-many of the fundamentals that were learned in class over the semester. Some of the key fundamentals
-being perspective shifting, edge detection, and intensity processing. The main resources on card
-identification for this project was ``Poker Vision: Playing Cards and Chips Identification based on
-Image Processing'' \cite{poker-vision}, and a YouTube video ``Playing Card Detection Using
-OpenCV-Python on the Raspberry Pi 3 + PiCamera'' \cite{opencv-card-detection}. While these
-resources were fantastic deviations were made to fit our use case and desired difficulty level.
+For the project, playing card detection and classification was chosen. Based on research of the
+topic, it was determined that image processing implementations exist that use the primitives learned
+in the course. Key fundamentals used include: perspective shifting, edge detection, and intensity
+processing. The main resources on card identification for this project were ``Poker Vision: Playing
+Cards and Chips Identification based on Image Processing'', and a YouTube video ``Playing Card
+Detection Using OpenCV-Python on the Raspberry Pi 3 + PiCamera''
+\cite{opencv-card-detection}\cite{poker-vision}. While these resources were thorough, deviations
+were made to fit our scope. Our card detecting application is called Most Constrained Card Detector
+(MCCD).
 
 \section{Goal}
 The goal of this project is to develop a single application that, given a controlled environment
@@ -98,9 +98,9 @@ between our design and that of P. Martins, L. P. Reis, and L Teofilo \cite{poker
 Another source drawn upon throughout implementation of this project was the YouTube video ``Playing
 Card Detection Using OpenCV-Python on the Raspberry Pi 3 + PiCamera'' by Edje Electronics - an
 OpenCV card detection implemented in Python \cite{opencv-card-detection}. Although the pipeline
-design for Most Constrained Card Detector (MCCD) was based solely on the ``Poker Vision'' paper and
-Edje Electronics' YouTube video, this project provided inspiration for user interface elements and
-acted as a reference for a practical implementation of a similar image pipeline.
+design for MCCD was based solely on the ``Poker Vision'' paper and Edje Electronics' YouTube video,
+this project provided inspiration for user interface elements and acted as a reference for a
+practical implementation of a similar image pipeline.
 
 
 \section{Pipeline Design}
@@ -238,31 +238,34 @@ and image output for each stage.
 \end{figure}
 
 \subsection{Encountered Issues}
-Once we got the contours of the card it is necessary to then perspective shift it to a known size so
-that we can hard-code locations for the rank and suit. The corners of the card were estimated using
-the contours, however the points need to then be mapped to the perspective shifted image in a manor
-that provides the scaled image of a card with the suit and rank information at the top left corner.
-The perspective shift introduced a trade-off issue; account for all rotations at the cost of
-development time. We chose a custom method where the center of the card was found and used as the
-origin of a graph, and then assumed the corner point in Quadrant 2 to be top left, point in Quadrant
-1 to be top right, and so on (Figure \ref{fig:graph}). Since we do not care if the card is upside
-down this allows for about 180 deg of card position that will work with the model.
+Once the contours of the card are obtained it is necessary to perspective shift to a known size for
+feature extraction. The corners of the card are estimated using the contours, however the points
+need to be mapped to the perspective shifted image in a manor that provides the scaled image of a
+card with the suit and rank information at the top left corner. The perspective shift introduced a
+trade-off issue; account for all rotations at the cost of development time. A custom method was
+chosen where the center of the card was found and used as the origin of a graph, and then assumed
+the corner point in Quadrant 2 to be top left, point in Quadrant 1 to be top right, and so on
+(Figure \ref{fig:graph}). Since the card is symmetrical about the middle of the long side, this
+allows for about 180 deg of card position that will work with the model.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics{graph-quadrants.png}}
-\caption{Quadrents of a graph}
+\caption{Quadrants of a graph}
 \label{fig:graph}
 \end{figure}
-
-% Since the rank and suit images (identifier images) were hardcoded from the scaled card image,
-% there is deviation present in the identifier images the absolute difference for matching against
-% the identifier template would also be inconsistent. Therefore further processing was done 
 
 The output of the preprocessed rank and suit images (identifier images) were matched against a
 template image of the rank and suit that was found online. Initially this provided extremely poor
 matching; therefore, images were taken of all the necessary identifiers and then by hand cropped and
-thresholded into a custom identifier image. This greatly improved performace for our card deck, with
-the downside that it is only calibrated for a single deck of cards.
+thresholded into a custom identifier image (Figure \ref{fig:templates}). This greatly improved
+performance for our card deck, with the downside that it is only calibrated for a single deck of
+cards.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{templates.png}}
+\caption{The hand made card identifier templates}
+\label{fig:templates}
+\end{figure}
 
 After testing the implementation, spade face cards were being consistently misidentified as a
 diamond. This was caused by the dilation of the spade suit image connecting it to the border of the
@@ -287,7 +290,7 @@ reduced in size from 3x3 to 2x2. Figure \ref{fig:good-jack} shows the results of
 Overall the detection of cards was very accurate in the highly constrained environment. To test the
 accuracy of the implemented card detector, an entire deck of cards was tested rapidly using the live
 view. The detector was able to correctly identify all cards in the deck, provided they were rotated
-off axis minimally (less than 30 degrees to the left or right). A video was captured for posterity.
+off axis minimally (less than 45 degrees to the left or right). A video was captured for posterity.
 
 As the feature extraction is the most sensitive part of the pipeline, a set of feature extraction
 pipeline stages was captured for confirmation of proper performance (Figure
@@ -312,15 +315,14 @@ pipeline stages was captured for confirmation of proper performance (Figure
 The initial benchmark that we set for our programs computational performance was around 5 frames per
 second (fps), this is the speed that we observed in other usable implementations (they were running
 on a Raspberry Pi 3, therefore performance is expected to be lower) \cite{opencv-card-detection}.
-Our implementations general speed was around 20 fps (With 7 card on screen); this was better than
-expected. Even with a arguably inefficient GUI library written using Opencv (cvui), we were able to 
+Our implementations general speed was around 20 fps (With 7 card on screen).
 
 \section{Limitations}
-These are the following limitations that were found with the current application:
+The following are limitations of the application:
 \begin{itemize}
-\item Calibrated to a specific card pack. Other card packs do not recieve the same amount of correct
-        rank and suit estimates.
-\item The entire card must be on the image being processed. If Even a tiny bit is cut off the
+\item Calibrated to a specific card pack. Although un-tested, other card packs would likely
+        experience reduced accuracy.
+\item The entire card must be on the image being processed. If the card contour is broken at all
         detection will fail. This also holds true for overlapping cards; therefore, cards must not
         overlap each other (which is extremely common in card games).
 \item The rotation of the card on the page must be within 45 deg from upright. The matching of the
@@ -329,7 +331,8 @@ These are the following limitations that were found with the current application
         descriptions on both top left corners. So there is about 180 deg discontinuous position
         where the detection will work.
 \item Bright shining lights that reflect off the card can wash out key features that are used to
-        detect the card, while still being readable to humans.
+        detect the card, though it is still readable to humans.
+\item Card-like objects will generate a estimate despite not being a card.
 \end{itemize}
 
 \section{Practical Applications}
@@ -352,18 +355,18 @@ However, a more static application such as an overhead tracking camera mounted a
 another very practical application of this tool.
 
 \section{Future Improvements}
-While we are happy with the state of our application we realize there is still place for
+While MCDC are happy with the state of our application we realize there is still place for
 improvement. The potential improvements are mostly derived from the shortcomings in the
 \ref{Limitations} section.
 
 To handle full 360 degree rotation of the cards we could improve upon our corner detection by taking
 into account the distance between points and then matching the card length and with, so that we
-always receive the top corneres as being the shorter width of the card. This would allow the
+always receive the top corners as being the shorter width of the card. This would allow the
 perspective transform to always map the card so that the rank and suit info is in the top left
 corner.
 
-The appliation is currently calibrated for a specific card pack with a specific font for the rank
-and suit identifiers. To improve the versitility of the program we could generate more reference
+The application is currently calibrated for a specific card pack with a specific font for the rank
+and suit identifiers. To improve the versatility of the program we could generate more reference
 identifiers and then determine rank and suit based upon a statistical model. With a large enough
 reference bank we could probably cover a very large range of usable cards.
 
@@ -376,16 +379,16 @@ improve speed as the amount of parallel instructions running would drastically i
 The implementation of playing card detection and identification using image processing and OpenCV
 was a great learning experience. We were able to test our fundamental knowledge of image processing
 and learn a bit beyond what we were taught in class. Overall we are happy with the outcome of our
-application; we were able to relaibly detect almost all cards. There were still cases with specific
+application; we were able to reliably detect almost all cards. There were still cases with specific
 cards where the output would be consistently incorrect. Other than that the main issues with the
 current implementation is that there are conditions such as cut off cards, overexposed lighting,
-orientation, etc. that cause the identification of cards to fail. A couple strategies at mitegating
+orientation, etc. that cause the identification of cards to fail. A couple strategies at mitigating
 these issues have also been discussed along with potential to improve computational performance.
 
 \begin{thebibliography}{00}
 \bibitem{poker-vision} P. Martins, L. P. Reis, and L Teofilo, ``Poker Vision: Playing Cards and
     Chips Identification based on Image Processing''.
-\bibitem{opencv-card-detection} Youtube video here on card detection
+\bibitem{opencv-card-detection} Edje Electronics. Playing Card Detection Using OpenCV-Python on the Raspberry Pi 3 + PiCamera. (Oct. 10, 2017). Accessed: July 5, 2022. [Online Video]. Available: https://youtu.be/m-QPjO-2IkA
 \end{thebibliography}
 \vspace{12pt}
 
