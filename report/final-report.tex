@@ -213,6 +213,30 @@ one can set parameters for pipeline processes such as Kernel size for the Gaussi
 \label{fig:gui}
 \end{figure}
 
+\subsection{Pipeline}
+In the final implementation the histogram equilization is omitted based on performance testing, under
+the specified environment criteria and constraints it performed better. Figure
+\ref{fig:extraction-pipeline} shows the final card extraction pipeline and the image outputs of each
+stage.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{ActualCardExtraction.png}}
+\caption{Card extraction pipeline and corresponding output.}
+\label{fig:extraction-pipeline}
+\end{figure}
+
+The feature extraction and identification pipeline underwent a minor change from the initial design.
+Otsu's method was used in place of adaptive thresholding, in the constrained environment Otsu's
+method is performant and provides comparable out to adaptive thresholding. Figure
+\ref{fig:feature-extraction-pipeline} shows the final feature extraction and identification pipeline
+and image output for each stage.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{PipelineExecFlowchart.png}}
+\caption{Feature extraction and identification pipeline with corresponding output.}
+\label{fig:feature-extraction-pipeline}
+\end{figure}
+
 \subsection{Encountered Issues}
 The key issues encountered while programming the application was the detection of the card border.
 Once this preprocessing was done to the image and the edge detection was run, the contours were
@@ -345,7 +369,5 @@ these issues have also been discussed along with potential to improve computatio
 \bibitem{opencv-card-detection} Youtube video here on card detection
 \end{thebibliography}
 \vspace{12pt}
-\color{red}
-IEEE conference templates contain guidance text for composing and formatting conference papers. Please ensure that all template text is removed from your conference paper prior to submission to the conference. Failure to remove the template text from your paper may result in your paper not being published.
 
 \end{document}
