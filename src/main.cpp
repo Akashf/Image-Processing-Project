@@ -1,4 +1,6 @@
-#include "deckTemplate.h"
+#include "DeckTemplate.h"
+#include "Pipeline.h"
+#include "Utilities.h"
 
 #include <iostream>
 #include <unordered_map>
@@ -21,19 +23,6 @@
 #define WINDOW_NAME    "Most Constrained Card Detector"
 
 namespace mccd {
-
-	struct CannyParameters
-	{
-		size_t low_threshold = 0;
-		size_t high_threshold = 255;
-	};
-
-
-	struct GaussianParameters
-	{
-		size_t kernel_size = 3;
-		float sigma = 0;
-	};
 
 	const std::vector<std::string> sub_stage_titles = 
 	{
@@ -71,8 +60,8 @@ int main()
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_WARNING);
 
 	// CVUI Window config
-	size_t window_height = 1080;
-	size_t window_width = 1920;
+	const size_t window_height = 1080;
+	const size_t window_width = 1920;
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
@@ -97,7 +86,10 @@ int main()
 	mccd::CannyParameters canny_params; 
 	canny_params.low_threshold = 0;
 	canny_params.high_threshold = 255;
-	
+
+	// Contour parameters (defaults)
+	mccd::ContourParameters contour_params;
+
 	// Create windows
 	EnhancedWindow settings(0, 0, 320, window_height, "Settings");
 	EnhancedWindow image(settings.width(), 0, cards_color.cols + 20, cards_color.rows + 40, "Active Image");
@@ -134,8 +126,7 @@ int main()
 		{"Output", cv::Mat()},
 	};
 
-	// Operating data
-	// Main window
+	// Operating data - main window
 	size_t active_image_index = 0;
 	std::string active_stage = "Source";
 	bool save_image = false;
@@ -143,7 +134,7 @@ int main()
 	cv::Mat cards;
 	cv::Mat display_image;
 
-	// Sub window
+	// Operating data - Sub window
 	size_t active_card_index = 0;
 	size_t active_substage_index = 0;
 	std::string active_substage = "Warped";
@@ -173,10 +164,11 @@ int main()
 		auto time_delta = now - time;
 		time = now;
 		auto frame_time = std::chrono::duration_cast<std::chrono::microseconds>(time_delta).count() / 1000.0;
-		std::cout << "Frame time (ms): " << frame_time << " | "
-				  << "FPS(): " << 1.0 / (frame_time / 1000) << "\n";
+		std::cout 
+			<< "Frame time (ms): " << frame_time << " | "
+			<< "FPS(): " << 1.0 / (frame_time / 1000) << "\n";
 
-		// Read image from camera
+		// Read image from camera if present 
 		if (use_camera)
 		{
 			camera >> cam_frame;
@@ -191,6 +183,8 @@ int main()
 
 		// Clear background color
 		frame = cv::Scalar(53, 101, 77);
+
+		// TODO: App Class Function 
 		if (save_image)
 		{
 			std::stringstream ss;
@@ -208,20 +202,22 @@ int main()
 
 		// Instantiate and execute pipeline 
 		cv::GMat g_in;
-		cv::GMat g_blurred = cv::gapi::gaussianBlur
-		(
-			g_in, 
-			{ (int)gauss_params.kernel_size, (int)gauss_params.kernel_size }, 
-			gauss_params.sigma
-		);
-		cv::GMat g_equalized = cv::gapi::equalizeHist(g_blurred);
-		cv::GMat g_edges = cv::gapi::Canny(g_blurred, canny_params.low_threshold, canny_params.high_threshold);
-		cv::GArray<cv::GArray<cv::Point>> g_contours = cv::gapi::findContours(g_edges, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+		mccd::GGaussianBlur gaussianStage(g_in, gauss_params);
+		mccd::GHistEqualize equalizeStage(gaussianStage.getOutput());
+		mccd::GCannyEdges cannyStage(gaussianStage.getOutput(), canny_params);
+		mccd::GContours contourStage(cannyStage.getOutput(), contour_params);
+
+		cv::GMat g_equalized = equalizeStage.getOutput();
+		cv::GMat g_blurred = gaussianStage.getOutput();
+		cv::GMat g_edges = cannyStage.getOutput();
+		cv::GArray<mccd::GContour> g_contours = contourStage.getOutput();
+
 		cv::GComputation pipeline(cv::GIn(g_in), cv::GOut(g_blurred, g_equalized, g_edges, g_contours));
 	
 		// Execute pipeline
 		pipe_out["Source"] = cards;
-		std::vector<std::vector<cv::Point>> contours;
+		mccd::Contours contours;
 		pipeline.apply(
 			cv::gin(cards), 
 			cv::gout
@@ -233,6 +229,7 @@ int main()
 			) 
 		);
 
+		// App Class members 
 		std::vector<cv::Rect> boundRect(contours.size());
 		std::vector<cv::Mat> card_images = {};
 		std::vector<cv::Point> card_midpoints = {};
