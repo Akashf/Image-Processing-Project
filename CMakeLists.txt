@@ -17,3 +17,9 @@ target_link_libraries(card-reader ${OpenCV_LIBS})
 set_property(TARGET card-reader PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 add_subdirectory(vendor/cvui)
+
+# Copy all assets to install directory 
+install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/assets/ 
+        DESTINATION ${INSTALL_PATH}/assets
+        FILES_MATCHING PATTERN "*.jpg"  PATTERN "*.jpg")
+    

@@ -178,7 +178,7 @@ int main()
 	bool use_camera = false;
 	if (!camera.isOpened())
 	{
-		std::cout << "Cannot connect to camera";
+		std::cout << "Cannot connect to camera... offline mode only\n";
 		camera_available = false;
 	}
 	
