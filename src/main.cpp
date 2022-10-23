@@ -32,15 +32,6 @@ struct GaussianParameters
 	int sigma = 0;
 };
 
-
-struct ThresholdParameters
-{
-	int threshold = 100;
-	int max = 255;
-	int type = cv::THRESH_BINARY;
-};
-
-
 int main() 
 {   
 	// OpenCV config
@@ -685,8 +676,11 @@ int main()
 		// everything on the screen.
 		cvui::imshow(WINDOW_NAME, frame);
 
-		// Check if ESC was pressed
-		if (cv::waitKey(30) == 27) {
+		// Check if esc or 'X' was pressed
+		const bool escPressed = cv::waitKey(30) == 27;
+		const bool exitPressed = cv::getWindowProperty(WINDOW_NAME, cv::WND_PROP_VISIBLE) < 1;
+		if (escPressed || exitPressed) 
+		{
 			break;
 		}
 	}
