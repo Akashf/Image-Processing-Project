@@ -1,3 +1,5 @@
+#include "deckTemplate.h"
+
 #include <iostream>
 #include <unordered_map>
 #include <array>
@@ -18,74 +20,54 @@
 
 #define WINDOW_NAME    "Most Constrained Card Detector"
 
+namespace mccd {
 
-struct CannyParameters
-{
-	int low_threshold = 0;
-	int high_threshold = 255;
-};
+	struct CannyParameters
+	{
+		uint32_t low_threshold = 0;
+		uint32_t high_threshold = 255;
+	};
 
 
-struct GaussianParameters
-{
-	int kernel_size = 3;
-	int sigma = 0;
-};
+	struct GaussianParameters
+	{
+		uint32_t kernel_size = 3;
+		float sigma = 0;
+	};
+
+} // namespace mccd
+
 
 int main() 
 {   
 	// OpenCV config
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_WARNING);
 
-	// "Frame buffer"
-	int window_height = 1080;
-	int window_width = 1920;
-	cv::Size rank_size(30, 45);
-
+	// CVUI Window config
+	size_t window_height = 1080;
+	size_t window_width = 1920;
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
 	const std::string test_image_root = "assets/test_images/";
 	cv::Mat source = cv::imread(test_image_root + "cards-numerous.jpg");
 
-	// Load rank and suit templates
-	std::vector<std::pair<std::string, cv::Mat>> rank_images = {};
-	std::vector<std::string> rank_names = {
-		"Ace", "Two", "Three", "Four", "Five", "Six",
-		"Seven", "Eight", "Nine", "Ten", "Jack", "Queen",
-		"King"
-	};
-
-	const std::string template_root = "assets/template_images/";
-	for (const auto& rank: rank_names)
-	{
-		cv::Mat img = cv::imread(template_root + rank + ".png", cv::IMREAD_GRAYSCALE);
-		cv::Mat resized;
-		cv::resize(img, resized, rank_size);
-		rank_images.push_back({ rank, resized});
-	}
-
-	std::vector<std::pair<std::string, cv::Mat>> suit_images = {};
-	std::vector<std::string> suit_names = {
-		"Hearts", "Clubs", "Spades", "Diamonds"
-	};
-
-	
-	for (const auto& suit: suit_names)
-	{
-		suit_images.push_back({suit, cv::imread(template_root + suit + ".png", cv::IMREAD_GRAYSCALE) });
-	}
+	// Load deck template
+	const cv::Size rankSize(30, 45);
+	const std::string templateRoot = "assets/template_images/";
+	const std::string templateExt = "png";
+	DeckTemplate deckTemplate(rankSize, templateRoot, "png");
 
 	// Image to display 
 	cv::Mat cards_color = source;
 
 	// Gaussian Parameters 
-	GaussianParameters gauss_params; 
+	mccd::GaussianParameters gauss_params; 
 	gauss_params.kernel_size = 3;
 	gauss_params.sigma = 0;
 
 	// Canny parameters 
-	CannyParameters canny_params; 
+	mccd::CannyParameters canny_params; 
 	canny_params.low_threshold = 0;
 	canny_params.high_threshold = 255;
 	
@@ -221,7 +203,12 @@ int main()
 
 		// Instantiate and execute pipeline 
 		cv::GMat g_in;
-		cv::GMat g_blurred = cv::gapi::gaussianBlur(g_in, { gauss_params.kernel_size, gauss_params.kernel_size }, gauss_params.sigma);
+		cv::GMat g_blurred = cv::gapi::gaussianBlur
+		(
+			g_in, 
+			{ (int)gauss_params.kernel_size, (int)gauss_params.kernel_size }, 
+			gauss_params.sigma
+		);
 		cv::GMat g_equalized = cv::gapi::equalizeHist(g_blurred);
 		cv::GMat g_edges = cv::gapi::Canny(g_blurred, canny_params.low_threshold, canny_params.high_threshold);
 		cv::GArray<cv::GArray<cv::Point>> g_contours = cv::gapi::findContours(g_edges, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
@@ -387,7 +374,7 @@ int main()
 
 			int min_diff = std::numeric_limits<int>().max();
 			float max_conf = 0;
-			for (const auto& img: rank_images)
+			for (const auto& img: deckTemplate.getRankTemplateImages())
 			{
 				cv::Mat diff_image; 
 				cv::Mat tem;
@@ -476,7 +463,7 @@ int main()
 			// Identify rank 
 			min_diff = std::numeric_limits<int>().max();
 			std::string suit_match = "";
-			for (const auto& img : suit_images)
+			for (const auto& img : deckTemplate.getSuitTemplateImages())
 			{
 				cv::Mat diff_image;
 				cv::Mat tem;
@@ -614,22 +601,22 @@ int main()
 			
 			cvui::text("Kernel Size");
 			cvui::space(10);
-			cvui::trackbar(width, &gauss_params.kernel_size, 1, 9, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 2);
+			cvui::trackbar(width, (int*)&gauss_params.kernel_size, 1, 9, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 2);
 
 			cvui::text("Sigma");
 			cvui::space(10);
-			cvui::trackbar(width, &gauss_params.sigma, 0, 10, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar(width, (int*)&gauss_params.sigma, 0, 10, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10); // add 20px of empty space
 
 			cvui::text("Canny Configuration");
 			cvui::space(10);
 			cvui::text("Low Threshold");
 			cvui::space(4);
-			cvui::trackbar(width, &canny_params.low_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar(width, (int*)&canny_params.low_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(4);
 			cvui::text("High Threshold");
 			cvui::space(4);
-			cvui::trackbar(width, &canny_params.high_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar(width, (int*)&canny_params.high_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 		}
 		settings.end();
