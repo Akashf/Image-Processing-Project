@@ -24,15 +24,42 @@ namespace mccd {
 
 	struct CannyParameters
 	{
-		uint32_t low_threshold = 0;
-		uint32_t high_threshold = 255;
+		size_t low_threshold = 0;
+		size_t high_threshold = 255;
 	};
 
 
 	struct GaussianParameters
 	{
-		uint32_t kernel_size = 3;
+		size_t kernel_size = 3;
 		float sigma = 0;
+	};
+
+	const std::vector<std::string> sub_stage_titles = 
+	{
+		"Warped",
+		"Rank",
+		"Rank Threshold",
+		"Rank Dilated",
+		"Rank Contours",
+		"Rank Bounded",
+		"Suit",
+		"Suit Threshold",
+		"Suit Dilated",
+		"Suit Eroded",
+		"Suit Contours",
+		"Suit Bounded",
+	};
+
+	const std::vector<std::string> stage_titles = 
+	{
+		"Source",
+		"Blurred",
+		"Equalized",
+		"Edges",
+		"Contours",
+		"Rectangle Contours",
+		"Output"
 	};
 
 } // namespace mccd
@@ -77,22 +104,9 @@ int main()
 	EnhancedWindow sub_image(settings.width(), window_height - 500, 350, 500, "Individual Card View");
 
 	// Create image stores
-	std::vector<std::string> sub_stage_titles = {
-		"Warped",
-		"Rank",
-		"Rank Threshold",
-		"Rank Dilated",
-		"Rank Contours",
-		"Rank Bounded",
-		"Suit",
-		"Suit Threshold",
-		"Suit Dilated",
-		"Suit Eroded",
-		"Suit Contours",
-		"Suit Bounded",
-	};
-
-	std::unordered_map<std::string, cv::Mat> card_img_data = {
+	// TODO: Move to class -> CardData
+	std::unordered_map<std::string, cv::Mat> card_img_data = 
+	{
 		{ "Warped", cv::Mat::zeros(10, 10, CV_8UC3) },
 		{ "Rank", cv::Mat::zeros(10, 10, CV_8UC1)},
 		{ "Rank Thresholded", cv::Mat::zeros(10, 10, CV_8UC1)},
@@ -108,17 +122,8 @@ int main()
 		{ "Suit Bounded", cv::Mat::zeros(10, 10, CV_8UC1)}
 	};
 
-	std::vector<std::string> stage_titles = {
-		"Source",
-		"Blurred",
-		"Equalized",
-		"Edges",
-		"Contours",
-		"Rectangle Contours",
-		"Output"
-	};
-
-	std::unordered_map<std::string, cv::Mat> pipe_out = {
+	std::unordered_map<std::string, cv::Mat> pipe_out = 
+	{
 		{"Source", cv::Mat::zeros(10, 10, CV_8UC1)},
 		{"Blurred", cv::Mat()},
 		{"Equalized", cv::Mat()},
@@ -131,7 +136,7 @@ int main()
 
 	// Operating data
 	// Main window
-	int active_image_index = 0;
+	size_t active_image_index = 0;
 	std::string active_stage = "Source";
 	bool save_image = false;
 	bool save_subimage = false;
@@ -139,8 +144,8 @@ int main()
 	cv::Mat display_image;
 
 	// Sub window
-	int active_card_index = 0;
-	int active_substage_index = 0;
+	size_t active_card_index = 0;
+	size_t active_substage_index = 0;
 	std::string active_substage = "Warped";
 	cv::Mat sub_display_image; 
 
@@ -527,11 +532,11 @@ int main()
 		}
 
 		// Select active stage 
-		active_stage = stage_titles[active_image_index];
+		active_stage = mccd::stage_titles[active_image_index];
 		display_image = pipe_out[active_stage];
 
 		// Select active sub image stage
-		active_substage = sub_stage_titles[active_substage_index];
+		active_substage = mccd::sub_stage_titles[active_substage_index];
 		if (card_data.empty())
 		{
 			sub_display_image = cv::Mat::zeros(sub_image.heightWithoutBorders(), sub_image.widthWithoutBorders(), CV_8UC3);
@@ -554,21 +559,21 @@ int main()
 		settings.begin(frame);
 		if (!settings.isMinimized()) 
 		{
-			int width = 300;
+			const size_t sliderWidth = 300;
 			cvui::text("Pipeline Stage - " + active_stage);
-			cvui::trackbar(width, &active_image_index, 0, (int)stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar<size_t>(sliderWidth, &active_image_index, 0, mccd::stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 
 			// Hanging 
 			if (card_data.size() > 1)
 			{
 				cvui::text("Active Card - " + std::to_string(active_card_index));
-				cvui::trackbar(width, &active_card_index, 0, (int)card_data.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+				cvui::trackbar<size_t>(sliderWidth, &active_card_index, 0, card_data.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 				cvui::space(10);
 			}
 			
 			cvui::text("Suit/Rank Stage - " + active_substage);
-			cvui::trackbar(width, &active_substage_index, 0, (int)sub_stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar<size_t>(sliderWidth, &active_substage_index, 0, mccd::sub_stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 
 			cvui::text("Save Active Image");
@@ -591,7 +596,7 @@ int main()
 				if (current != old)
 				{
 					active_card_index = 0;
-					old = current;;
+					old = current;
 				}
 				cvui::space(10);
 			}
@@ -601,22 +606,22 @@ int main()
 			
 			cvui::text("Kernel Size");
 			cvui::space(10);
-			cvui::trackbar(width, (int*)&gauss_params.kernel_size, 1, 9, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 2);
+			cvui::trackbar<size_t>(sliderWidth, &gauss_params.kernel_size, 1, 9, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 2);
 
 			cvui::text("Sigma");
 			cvui::space(10);
-			cvui::trackbar(width, (int*)&gauss_params.sigma, 0, 10, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
-			cvui::space(10); // add 20px of empty space
+			cvui::trackbar<float>(sliderWidth, &gauss_params.sigma, 0, 10, 0.1, "%0.1f");
+			cvui::space(10);
 
 			cvui::text("Canny Configuration");
 			cvui::space(10);
 			cvui::text("Low Threshold");
 			cvui::space(4);
-			cvui::trackbar(width, (int*)&canny_params.low_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar<size_t>(sliderWidth, &canny_params.low_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(4);
 			cvui::text("High Threshold");
 			cvui::space(4);
-			cvui::trackbar(width, (int*)&canny_params.high_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar<size_t>(sliderWidth, &canny_params.high_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 		}
 		settings.end();
@@ -647,7 +652,11 @@ int main()
 			{
 				disp = sub_display_image;
 			}
-			else if (active_substage == "Suit Contours" || active_substage == "Rank Contours" || active_substage == "Warped")
+			else if (
+				active_substage == "Suit Contours" 
+				|| active_substage == "Rank Contours" 
+				|| active_substage == "Warped"
+			)
 			{
 				disp = sub_display_image;
 			}
