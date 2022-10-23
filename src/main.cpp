@@ -54,7 +54,8 @@ int main()
 	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
 
 	// Source image 
-	cv::Mat source = cv::imread("cards-numerous.jpg");
+	const std::string test_image_root = "assets/test_images/";
+	cv::Mat source = cv::imread(test_image_root + "cards-numerous.jpg");
 
 	// Load rank and suit templates
 	std::vector<std::pair<std::string, cv::Mat>> rank_images = {};
@@ -64,9 +65,10 @@ int main()
 		"King"
 	};
 
+	const std::string template_root = "assets/template_images/";
 	for (const auto& rank: rank_names)
 	{
-		cv::Mat img = cv::imread("images/" + rank + ".png", cv::IMREAD_GRAYSCALE);
+		cv::Mat img = cv::imread(template_root + rank + ".png", cv::IMREAD_GRAYSCALE);
 		cv::Mat resized;
 		cv::resize(img, resized, rank_size);
 		rank_images.push_back({ rank, resized});
@@ -77,9 +79,10 @@ int main()
 		"Hearts", "Clubs", "Spades", "Diamonds"
 	};
 
+	
 	for (const auto& suit: suit_names)
 	{
-		suit_images.push_back({suit, cv::imread("images/" + suit + ".png", cv::IMREAD_GRAYSCALE) });
+		suit_images.push_back({suit, cv::imread(template_root + suit + ".png", cv::IMREAD_GRAYSCALE) });
 	}
 
 	// Image to display 
