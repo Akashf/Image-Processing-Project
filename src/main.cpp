@@ -172,7 +172,7 @@ int main()
 	cv::Mat cam_frame; 
 	cv::VideoCapture camera(0);
 	bool camera_available = true;
-	bool use_camera = true;
+	bool use_camera = false;
 	if (!camera.isOpened())
 	{
 		std::cout << "Cannot connect to camera";
