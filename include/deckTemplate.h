@@ -11,9 +11,9 @@ namespace mccd {
     using NamedImage = std::pair<std::string, cv::Mat>;
     struct DeckTemplateParams
     {
-        std::string folder;
-        std::string ext;
-        cv::Size_<size_t> rankSize;
+        std::string folder = "";
+        std::string ext = "";
+        cv::Size_<size_t> rankSize = {0, 0};
     };
 
     class DeckTemplate

@@ -20,13 +20,13 @@ namespace mccd {
 
     struct CannyParameters
     {
-        size_t low_threshold = 0;
-        size_t high_threshold = 255;
+        size_t lowThreshold = 0;
+        size_t highThreshold = 255;
     };
 
     struct GaussianParameters
     {
-        size_t kernel_size = 3;
+        size_t kernelSize = 3;
         float sigma = 0;
     };
 
@@ -72,7 +72,7 @@ namespace mccd {
         {
             m_out = cv::gapi::gaussianBlur(
                 m_in,
-                cv::Size_<size_t>{ m_params.kernel_size, m_params.kernel_size },
+                cv::Size_<size_t>{ m_params.kernelSize, m_params.kernelSize },
                 m_params.sigma
             );
         }
@@ -111,8 +111,8 @@ namespace mccd {
         {
             m_out = cv::gapi::Canny(
                 m_in, 
-                m_params.low_threshold, 
-                m_params.high_threshold
+                m_params.lowThreshold, 
+                m_params.highThreshold
             );
         }
 

@@ -11,7 +11,7 @@
 
 namespace mccd {
 
-    const std::vector<std::string> sub_stage_titles = 
+    const std::vector<std::string> subStageTitles = 
 	{
 		"Warped",
 		"Rank",
@@ -27,7 +27,7 @@ namespace mccd {
 		"Suit Bounded",
 	};
 
-	const std::vector<std::string> stage_titles = 
+	const std::vector<std::string> stageTitles = 
 	{
 		"Source",
 		"Blurred",

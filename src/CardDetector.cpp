@@ -119,207 +119,207 @@ namespace mccd {
     {
         // Extract + identify rank / suit
 		size_t i = 0;
-		int image_index = 0;
+		size_t imageIndex = 0;
 		for (auto& img: m_cardImages)
 		{
 			// Initialize card data 
 			m_cardData.push_back(m_cardImgDataDefault);
-			std::string best_match = "";
+			std::string bestMatch = "";
 
-			auto& card_map = m_cardData[image_index];
+			auto& card_map = m_cardData[imageIndex];
 			
 			// Extract + Identify Rank
-			cv::Rect rank_bounding_box(0, 0, 35, 55);
-			cv::Mat rank_image = img(rank_bounding_box);
+			cv::Rect rankBoundingBox(0, 0, 35, 55);
+			cv::Mat rankImage = img(rankBoundingBox);
 			
 			// Draw bounding box on card
-			cv::Mat card_img_color;
-			cv::cvtColor(img, card_img_color, cv::COLOR_GRAY2BGR);
-			cv::rectangle(card_img_color, rank_bounding_box, CV_RGB(0, 0, 255), 1);
+			cv::Mat cardImgColor;
+			cv::cvtColor(img, cardImgColor, cv::COLOR_GRAY2BGR);
+			cv::rectangle(cardImgColor, rankBoundingBox, CV_RGB(0, 0, 255), 1);
 
-			card_map["Rank"] = rank_image;
+			card_map["Rank"] = rankImage;
 	
-			cv::Mat rank_thresholded;
-			cv::threshold(rank_image, rank_thresholded, 150, 255, cv::THRESH_OTSU);
-			card_map["Rank Threshold"] = rank_thresholded.clone();
-			rank_thresholded = ~rank_thresholded;
+			cv::Mat rankThresholded;
+			cv::threshold(rankImage, rankThresholded, 150, 255, cv::THRESH_OTSU);
+			card_map["Rank Threshold"] = rankThresholded.clone();
+			rankThresholded = ~rankThresholded;
 
-			cv::Mat rank_dilated;
+			cv::Mat rankDilated;
 			auto element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(4,4));
-			cv::dilate(rank_thresholded, rank_dilated, element);
-			card_map["Rank Dilated"] = ~rank_dilated;
+			cv::dilate(rankThresholded, rankDilated, element);
+			card_map["Rank Dilated"] = ~rankDilated;
 
 			std::vector<std::vector<cv::Point>> contours; 
-			cv::findContours(rank_dilated, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+			cv::findContours(rankDilated, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 
 			// Select largest contour
-			std::vector<cv::Point> largest_c;
-			float max_area = 0;
+			mccd::Contour largestCountour;
+			float maxArea = 0;
 			for (auto& c: contours)
 			{
 				float area = cv::contourArea(c);
-				if (area > max_area)
+				if (area > maxArea)
 				{
-					max_area = area;
-					largest_c = c;
+					maxArea = area;
+					largestCountour = c;
 				}
 			}
 
 			// Draw bounding box of largest contour
-			cv::Rect bb = cv::boundingRect(largest_c);
+			cv::Rect bb = cv::boundingRect(largestCountour);
 
 			// Draw contours
-			cv::Mat rank_contour_base; 
-			cv::cvtColor(~rank_dilated, rank_contour_base, cv::COLOR_GRAY2BGR);
+			cv::Mat rankCountourBase; 
+			cv::cvtColor(~rankDilated, rankCountourBase, cv::COLOR_GRAY2BGR);
 
-			if (!rank_contour_base.empty())
+			if (!rankCountourBase.empty())
 			{
 				for (int i = 0; i < contours.size(); i++)
 				{
-					cv::drawContours(rank_contour_base, contours, i, { 255, 0, 0 }, 1);
+					cv::drawContours(rankCountourBase, contours, i, { 255, 0, 0 }, 1);
 				}
 			}
 			
-			card_map["Rank Contours"] = rank_contour_base;
+			card_map["Rank Contours"] = rankCountourBase;
 
-			cv::Mat bounded_rank = cv::Mat::zeros(rank_image.size(), CV_8UC1);
-			if (!largest_c.empty())
+			cv::Mat boundedRank = cv::Mat::zeros(rankImage.size(), CV_8UC1);
+			if (!largestCountour.empty())
 			{
-				bounded_rank = rank_dilated(bb);
+				boundedRank = rankDilated(bb);
 			}
-			card_map["Rank Bounded"] = ~bounded_rank;
+			card_map["Rank Bounded"] = ~boundedRank;
 
-			cv::Mat rank_identity = ~bounded_rank;
-			card_map["Rank Final"] = rank_identity;
+			cv::Mat rankIdentity = ~boundedRank;
+			card_map["Rank Final"] = rankIdentity;
 
-			int min_diff = std::numeric_limits<int>().max();
-			float max_conf = 0;
+			int minDiff = std::numeric_limits<int>().max();
+			float maxConfidence = 0;
 			for (const auto& img: m_deckTemplate.getRankTemplateImages())
 			{
-				cv::Mat diff_image; 
-				cv::Mat tem;
-				cv::resize(img.second, tem, rank_identity.size());
-				cv::absdiff(rank_identity, tem, diff_image);
-				int avg_diff = cv::sum(diff_image)[0] / 255;
-				if (avg_diff < min_diff)
+				cv::Mat diffImage; 
+				cv::Mat templateImage;
+				cv::resize(img.second, templateImage, rankIdentity.size());
+				cv::absdiff(rankIdentity, templateImage, diffImage);
+				int avgDiff = cv::sum(diffImage)[0] / 255;
+				if (avgDiff < minDiff)
 				{
-					min_diff = avg_diff;
-					best_match = img.first;
+					minDiff = avgDiff;
+					bestMatch = img.first;
 				}	
 			}
 
-			m_cardBestGuesses.push_back(best_match);
+			m_cardBestGuesses.push_back(bestMatch);
 		
-			cv::Rect suit_bounding_box(0, 55, 35, 45);
-			cv::rectangle(card_img_color, suit_bounding_box, CV_RGB(0, 255, 0), 1);
-			card_map["Warped"] = card_img_color;
+			cv::Rect suitBoundingBox(0, 55, 35, 45);
+			cv::rectangle(cardImgColor, suitBoundingBox, CV_RGB(0, 255, 0), 1);
+			card_map["Warped"] = cardImgColor;
 
 			// Extract + Identify Suit 
-			cv::Mat suit_image = img(suit_bounding_box);
-			card_map["Suit"] = suit_image;
+			cv::Mat suitImage = img(suitBoundingBox);
+			card_map["Suit"] = suitImage;
 		
-			cv::Mat suit_thresholded; 
-			cv::threshold(suit_image, suit_thresholded, 120, 255, cv::THRESH_OTSU);
-			card_map["Suit Threshold"] = suit_thresholded.clone();
-			suit_thresholded = ~suit_thresholded;
+			cv::Mat suitThresholded; 
+			cv::threshold(suitImage, suitThresholded, 120, 255, cv::THRESH_OTSU);
+			card_map["Suit Threshold"] = suitThresholded.clone();
+			suitThresholded = ~suitThresholded;
 		
 			// Closing op for cutoff club stems
-			cv::Mat suit_dilated;
+			cv::Mat suitDilated;
 			element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(1, 1));
-			cv::dilate(suit_thresholded, suit_dilated, element);
-			card_map["Suit Dilated"] = ~suit_dilated;
+			cv::dilate(suitThresholded, suitDilated, element);
+			card_map["Suit Dilated"] = ~suitDilated;
 
-			cv::Mat suit_eroded;
-			cv::erode(suit_dilated, suit_eroded, element);
-			card_map["Suit Eroded"] = ~suit_eroded;
+			cv::Mat suitEroded;
+			cv::erode(suitDilated, suitEroded, element);
+			card_map["Suit Eroded"] = ~suitEroded;
 			
-			std::vector<std::vector<cv::Point>> suit_contours;
-			cv::findContours(suit_dilated, suit_contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+			std::vector<std::vector<cv::Point>> suitContours;
+			cv::findContours(suitDilated, suitContours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 
 			// Calculate bb of largest area contour
 			cv::Rect suit_bb; 
 			{
-				std::vector<cv::Point> largest_contour;
+				mccd::Contour largestContour;
 
-				float max_area = 0;
-				for (auto& c : suit_contours)
+				float maxArea = 0;
+				for (auto& c : suitContours)
 				{
 					float area = cv::contourArea(c);
-					if (area > max_area)
+					if (area > maxArea)
 					{
-						max_area = area;
-						largest_contour = c;
+						maxArea = area;
+						largestContour = c;
 					}
 				}
-				suit_bb = cv::boundingRect(largest_contour);
+				suit_bb = cv::boundingRect(largestContour);
 			}
 
 			// Draw suit contours
-			cv::Mat suit_contour_img;
-			cv::cvtColor(~suit_dilated, suit_contour_img, cv::COLOR_GRAY2BGR);
+			cv::Mat suitContourImage;
+			cv::cvtColor(~suitDilated, suitContourImage, cv::COLOR_GRAY2BGR);
 
-			if (!suit_contour_img.empty())
+			if (!suitContourImage.empty())
 			{
-				for (int i = 0; i < suit_contours.size(); i++)
+				for (int i = 0; i < suitContours.size(); i++)
 				{
-					cv::drawContours(suit_contour_img, suit_contours, i, { 255, 0, 0 }, 1);
+					cv::drawContours(suitContourImage, suitContours, i, { 255, 0, 0 }, 1);
 				}
 			}
 			
-			card_map["Suit Contours"] = suit_contour_img;
+			card_map["Suit Contours"] = suitContourImage;
 
-			cv::Mat bounded_suit = suit_dilated.clone();
+			cv::Mat boundedSuit = suitDilated.clone();
 			if (!suit_bb.empty())
 			{
-				bounded_suit = suit_dilated(suit_bb);
+				boundedSuit = suitDilated(suit_bb);
 			}
 			
 			// Final suit 
-			bounded_suit = ~bounded_suit;
-			card_map["Suit Bounded"] = bounded_suit;
+			boundedSuit = ~boundedSuit;
+			card_map["Suit Bounded"] = boundedSuit;
 
 			// Identify rank 
-			min_diff = std::numeric_limits<int>().max();
-			std::string suit_match = "";
+			minDiff = std::numeric_limits<int>().max();
+			std::string suitMatch = "";
 			for (const auto& img : m_deckTemplate.getSuitTemplateImages())
 			{
-				cv::Mat diff_image;
-				cv::Mat tem;
-				cv::resize(img.second, tem, bounded_suit.size());
-				cv::absdiff(bounded_suit, tem, diff_image);
-				int avg_diff = cv::sum(diff_image)[0] / 255;
-				if (avg_diff < min_diff)
+				cv::Mat diffImage;
+				cv::Mat templateImage;
+				cv::resize(img.second, templateImage, boundedSuit.size());
+				cv::absdiff(boundedSuit, templateImage, diffImage);
+				int avgDiff = cv::sum(diffImage)[0] / 255;
+				if (avgDiff < minDiff)
 				{
-					min_diff = avg_diff;
-					suit_match = img.first;
+					minDiff = avgDiff;
+					suitMatch = img.first;
 				}
 			}
 
-			m_suitBestGuesses.push_back(suit_match);
-			image_index++;
+			m_suitBestGuesses.push_back(suitMatch);
+			imageIndex++;
 		}
     }
 
 	void CardDetector::generateContourOverlay()
 	{
 		// Generate original contour overlay
-		cv::Mat contour_base = m_activeImageColor.clone();
+		cv::Mat contourBase = m_activeImageColor.clone();
 		for (size_t i = 0; i < m_contours.size(); i++)
 		{
-			cv::drawContours(contour_base, m_contours, i, cv::Scalar(0, 0, 255), 4);
+			cv::drawContours(contourBase, m_contours, i, cv::Scalar(0, 0, 255), 4);
 		}
-		m_cardPipeOuts["Contours"] = contour_base.clone();
+		m_cardPipeOuts["Contours"] = contourBase.clone();
 	}
 
 	void CardDetector::generateRectangularContourOverlay()
 	{
 		// Generate rectangle contour overlay
-		cv::Mat rect_contour_base = m_activeImageColor.clone();
+		cv::Mat rectContourBase = m_activeImageColor.clone();
 		for (size_t i = 0; i < m_rectContours.size(); i++)
 		{
-			cv::drawContours(rect_contour_base, m_rectContours, i, cv::Scalar(0, 0, 255), 2);
+			cv::drawContours(rectContourBase, m_rectContours, i, cv::Scalar(0, 0, 255), 2);
 		}
-		m_cardPipeOuts["Rectangle Contours"] = rect_contour_base.clone();
+		m_cardPipeOuts["Rectangle Contours"] = rectContourBase.clone();
 	}
 
 	void CardDetector::generateGuessAnnotatedOverlay()

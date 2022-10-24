@@ -54,21 +54,21 @@ namespace mccd {
             , m_cannyParams(cannyParams)
             , m_contourParams(contourParams)
         {
-            cv::GMat g_in = {};
+            cv::GMat gIn = {};
             mccd::GGaussianBlur gaussianStage(g_in, m_gaussParams);
             mccd::GHistEqualize equalizeStage(gaussianStage.getOutput());
             mccd::GCannyEdges cannyStage(gaussianStage.getOutput(), m_cannyParams);
             mccd::GContours contourStage(cannyStage.getOutput(), m_contourParams);
 
-            cv::GMat g_equalized = equalizeStage.getOutput();
-            cv::GMat g_blurred = gaussianStage.getOutput();
-            cv::GMat g_edges = cannyStage.getOutput();
-            cv::GArray<mccd::GContour> g_contours = contourStage.getOutput();
+            cv::GMat gEqualized = equalizeStage.getOutput();
+            cv::GMat gBlurred = gaussianStage.getOutput();
+            cv::GMat gEdges = cannyStage.getOutput();
+            cv::GArray<mccd::GContour> gContours = contourStage.getOutput();
 
             m_pipelineInternal = std::make_shared<cv::GComputation>
             (
-                cv::GIn(g_in),
-                cv::GOut(g_blurred, g_equalized, g_edges, g_contours)
+                cv::GIn(gIn),
+                cv::GOut(gBlurred, gEqualized, gEdges, gContours)
             );
         }
 

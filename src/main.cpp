@@ -30,64 +30,66 @@ int main()
 
 	// CVUI Window config
 	const std::string windowName = "Most Constrained Card Detector";
-	const size_t window_height = 1080;
-	const size_t window_width = 1920;
-	cv::Mat frame = cv::Mat(window_height, window_width, CV_8UC3);
+	const size_t windowHeight = 1080;
+	const size_t windowWidth = 1920;
+	cv::Mat frame = cv::Mat(windowHeight, windowWidth, CV_8UC3);
+	// TODO: Background clear color 
+	// TODO: Window clear color 
 
 	// Source image 
-	const std::string test_image_root = "assets/test_images/";
-	cv::Mat source = cv::imread(test_image_root + "cards-numerous.jpg");
-	cv::Mat cards_color = source;
+	const std::string testImageFolder = "assets/test_images/";
+	cv::Mat source = cv::imread(testImageFolder + "cards-numerous.jpg");
+	cv::Mat cardsColor = source;
 
 	// Load deck template
-	mccd::DeckTemplateParams templateParams; 
+	mccd::DeckTemplateParams templateParams;
 	templateParams.folder = "assets/template_images/";
 	templateParams.rankSize = { 30, 45 };
 	templateParams.ext = "png";
 
 	// Gaussian Parameters 
-	mccd::GaussianParameters gauss_params; 
-	gauss_params.kernel_size = 3;
-	gauss_params.sigma = 0;
+	mccd::GaussianParameters gaussParams; 
+	gaussParams.kernelSize = 3;
+	gaussParams.sigma = 0;
 
 	// Canny parameters 
-	mccd::CannyParameters canny_params; 
-	canny_params.low_threshold = 0;
-	canny_params.high_threshold = 255;
+	mccd::CannyParameters cannyParams; 
+	cannyParams.lowThreshold = 0;
+	cannyParams.highThreshold = 255;
 
 	// Contour parameters (defaults)
-	mccd::ContourParameters contour_params;
+	mccd::ContourParameters contourParams;
 
 	// Card detector
 	mccd::CardDetector cardDetector(templateParams);
 
 	// Create windows
-	EnhancedWindow settings(0, 0, 320, window_height, "Settings");
-	EnhancedWindow image(settings.width(), 0, cards_color.cols + 20, cards_color.rows + 40, "Active Image");
-	EnhancedWindow sub_image(settings.width(), window_height - 500, 350, 500, "Individual Card View");
+	EnhancedWindow settingsWindow(0, 0, 320, windowHeight, "Settings");
+	EnhancedWindow mainImageWindow(settingsWindow.width(), 0, cardsColor.cols + 20, cardsColor.rows + 40, "Active Image");
+	EnhancedWindow subImageWindow(settingsWindow.width(), windowHeight - 500, 350, 500, "Individual Card View");
 
 	// Operating data - main window
-	size_t active_image_index = 0;
-	std::string active_stage = "Source";
-	bool save_image = false;
-	bool save_subimage = false;
-	cv::Mat display_image;
+	size_t activeImageIndex = 0;
+	std::string activeStageName = "Source";
+	bool shouldSaveImage = false;
+	bool shouldSaveSubimage = false;
+	cv::Mat displayImage;
 
 	// Operating data - Sub window
-	size_t active_card_index = 0;
-	size_t active_substage_index = 0;
-	std::string active_substage = "Warped";
-	cv::Mat sub_display_image; 
+	size_t activeCardIndex = 0;
+	size_t activeSubstageIndex = 0;
+	std::string activeSubstageName = "Warped";
+	cv::Mat subDisplayImage; 
 
 	// Configure web cam parameters 
-	cv::Mat cam_frame; 
+	cv::Mat camFrame; 
 	cv::VideoCapture camera(0);
-	bool camera_available = true;
-	bool use_camera = false;
+	bool cameraAvailable = true;
+	bool useCamera = false;
 	if (!camera.isOpened())
 	{
 		std::cout << "Cannot connect to camera... offline mode only\n";
-		camera_available = false;
+		cameraAvailable = false;
 	}
 	
 	// Init cvui and tell it to create a OpenCV window
@@ -97,121 +99,121 @@ int main()
 	while (true) 
 	{
 		// FPS Tracking 
-		auto now = std::chrono::high_resolution_clock::now();
-		auto time_delta = now - time;
+		const auto now = std::chrono::high_resolution_clock::now();
+		const auto timeDelta = now - time;
+		const auto frameTimeMs = std::chrono::duration_cast<std::chrono::microseconds>(timeDelta).count() / 1000.0;
 		time = now;
-		auto frame_time = std::chrono::duration_cast<std::chrono::microseconds>(time_delta).count() / 1000.0;
 		std::cout 
-			<< "Frame time (ms): " << frame_time << " | "
-			<< "FPS(): " << 1.0 / (frame_time / 1000) << "\n";
+			<< "Frame time (ms): " << frameTimeMs << " | "
+			<< "FPS(): " << 1.0 / (frameTimeMs / 1000) << "\n";
 
 		// Clear frame 
 		frame = cv::Scalar(53, 101, 77);
 
 		// Read image from camera if present 
-		if (use_camera)
+		if (useCamera && cameraAvailable)
 		{
-			camera >> cam_frame;
-			cards_color = cam_frame;
+			camera >> camFrame;
+			cardsColor = camFrame;
 		}
 		else
 		{
-			cards_color = source.clone();
+			cardsColor = source.clone();
 		}
 
 		// Execute card feature detection and identification 
 		cardDetector.update
 		(
-			cards_color, 
-			gauss_params,
-			canny_params,
-			contour_params
+			cardsColor, 
+			gaussParams,
+			cannyParams,
+			contourParams
 		);
 
 		const auto& pipelineOut = cardDetector.getPipelineOutput();
 		const auto& cardData = cardDetector.getCardData();
  
 		// Resize image window to fit camera frame 
-		int newHeight = cards_color.rows + 40;
-		int newWidth = cards_color.cols + 20;
+		int newHeight = cardsColor.rows + 40;
+		int newWidth = cardsColor.cols + 20;
 
-		image.setHeight(newHeight);
-		image.setWidth(newWidth);
+		mainImageWindow.setHeight(newHeight);
+		mainImageWindow.setWidth(newWidth);
 
 		// Select active stage 
-		active_stage = mccd::stage_titles[active_image_index];
-		display_image = pipelineOut.at(active_stage);
+		activeStageName = mccd::stageTitles[activeImageIndex];
+		displayImage = pipelineOut.at(activeStageName);
 
 		// Select active sub image 
-		active_substage = mccd::sub_stage_titles[active_substage_index];
+		activeSubstageName = mccd::subStageTitles[activeSubstageIndex];
 
 		if (cardData.empty())
 		{
-			sub_display_image = cv::Mat::zeros(sub_image.heightWithoutBorders(), sub_image.widthWithoutBorders(), CV_8UC3);
+			subDisplayImage = cv::Mat::zeros(subImageWindow.heightWithoutBorders(), subImageWindow.widthWithoutBorders(), CV_8UC3);
 		}
 		else
 		{
-			active_card_index = active_card_index > cardData.size() - 1 ? cardData.size() - 1 : active_card_index;
-			sub_display_image = cardData.at(active_card_index).at(active_substage);
+			activeCardIndex = activeCardIndex > cardData.size() - 1 ? cardData.size() - 1 : activeCardIndex;
+			subDisplayImage = cardData.at(activeCardIndex).at(activeSubstageName);
 		}
 
-		if (save_image)
+		if (shouldSaveImage)
 		{
 			std::stringstream ss;
-			ss << "base_image_stage_" << active_stage << ".png";
-			cv::imwrite(ss.str(), display_image);
-			save_image = false;
+			ss << "base_image_stage_" << activeStageName << ".png";
+			cv::imwrite(ss.str(), displayImage);
+			shouldSaveImage = false;
 		}
 
-		if (save_subimage)
+		if (shouldSaveSubimage)
 		{
 			std::stringstream ss;
-			ss << "card_" << active_card_index << "_stage_" << active_substage << ".png";
-			cv::imwrite(ss.str(), sub_display_image);
-			save_subimage = false;
+			ss << "card_" << activeCardIndex << "_stage_" << activeSubstageName << ".png";
+			cv::imwrite(ss.str(), subDisplayImage);
+			shouldSaveSubimage = false;
 		}
 		
 		// Render the settings window and its content, if it is not minimized.
-		settings.begin(frame);
-		if (!settings.isMinimized()) 
+		settingsWindow.begin(frame);
+		if (!settingsWindow.isMinimized()) 
 		{
 			const size_t sliderWidth = 300;
-			cvui::text("Pipeline Stage - " + active_stage);
-			cvui::trackbar<size_t>(sliderWidth, &active_image_index, 0, mccd::stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::text("Pipeline Stage - " + activeStageName);
+			cvui::trackbar<size_t>(sliderWidth, &activeImageIndex, 0, mccd::stageTitles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 
 			// Hanging 
 			if (cardData.size() > 1)
 			{
-				cvui::text("Active Card - " + std::to_string(active_card_index));
-				cvui::trackbar<size_t>(sliderWidth, &active_card_index, 0, cardData.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+				cvui::text("Active Card - " + std::to_string(activeCardIndex));
+				cvui::trackbar<size_t>(sliderWidth, &activeCardIndex, 0, cardData.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 				cvui::space(10);
 			}
 			
-			cvui::text("Suit/Rank Stage - " + active_substage);
-			cvui::trackbar<size_t>(sliderWidth, &active_substage_index, 0, mccd::sub_stage_titles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::text("Suit/Rank Stage - " + activeSubstageName);
+			cvui::trackbar<size_t>(sliderWidth, &activeSubstageIndex, 0, mccd::subStageTitles.size() - 1, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 
 			cvui::text("Save Active Image");
 			cvui::space(8);
-			save_image = cvui::button("Save");
+			shouldSaveImage = cvui::button("Save");
 			cvui::space(10);
 
 			cvui::text("Save Card View");
 			cvui::space(8);
-			save_subimage = cvui::button("Save");
+			shouldSaveSubimage = cvui::button("Save");
 			cvui::space(10);
 
-			if (camera_available)
+			if (cameraAvailable)
 			{
 				cvui::text("Save Current Image");
 				cvui::space(8);
-				static bool old = use_camera;
+				static bool old = useCamera;
 				static bool current = old;
-				current = cvui::checkbox("Live", &use_camera);
+				current = cvui::checkbox("Live", &useCamera);
 				if (current != old)
 				{
-					active_card_index = 0;
+					activeCardIndex = 0;
 					old = current;
 				}
 				cvui::space(10);
@@ -222,65 +224,65 @@ int main()
 			
 			cvui::text("Kernel Size");
 			cvui::space(10);
-			cvui::trackbar<size_t>(sliderWidth, &gauss_params.kernel_size, 1, 9, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 2);
+			cvui::trackbar<size_t>(sliderWidth, &gaussParams.kernelSize, 1, 9, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 2);
 
 			cvui::text("Sigma");
 			cvui::space(10);
-			cvui::trackbar<float>(sliderWidth, &gauss_params.sigma, 0, 10, 0.1, "%0.1f");
+			cvui::trackbar<float>(sliderWidth, &gaussParams.sigma, 0, 10, 0.1, "%0.1f");
 			cvui::space(10);
 
 			cvui::text("Canny Configuration");
 			cvui::space(10);
 			cvui::text("Low Threshold");
 			cvui::space(4);
-			cvui::trackbar<size_t>(sliderWidth, &canny_params.low_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar<size_t>(sliderWidth, &cannyParams.lowThreshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(4);
 			cvui::text("High Threshold");
 			cvui::space(4);
-			cvui::trackbar<size_t>(sliderWidth, &canny_params.high_threshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
+			cvui::trackbar<size_t>(sliderWidth, &cannyParams.highThreshold, 0, 255, 1, "%0.1f", cvui::TRACKBAR_DISCRETE, 1);
 			cvui::space(10);
 		}
-		settings.end();
+		settingsWindow.end();
 		
-		image.begin(frame);
-		if (!image.isMinimized())
+		mainImageWindow.begin(frame);
+		if (!mainImageWindow.isMinimized())
 		{
 			cv::Mat disp; 
-			if (active_stage == "Contours" || active_stage == "Output" || active_stage == "Rectangle Contours")
+			if (activeStageName == "Contours" || activeStageName == "Output" || activeStageName == "Rectangle Contours")
 			{
-				disp = display_image;
+				disp = displayImage;
 			}
 			else
 			{
-				cv::cvtColor(display_image, disp, cv::COLOR_GRAY2BGR);
+				cv::cvtColor(displayImage, disp, cv::COLOR_GRAY2BGR);
 			}
 			cvui::image(disp);
 		}
-		image.end();
+		mainImageWindow.end();
 
-		sub_image.begin(frame);
-		if (!sub_image.isMinimized())
+		subImageWindow.begin(frame);
+		if (!subImageWindow.isMinimized())
 		{
 			cv::Mat disp; 
 			if (cardData.empty())
 			{
-				disp = sub_display_image;
+				disp = subDisplayImage;
 			}
 			else if (
-				active_substage == "Suit Contours" 
-				|| active_substage == "Rank Contours" 
-				|| active_substage == "Warped"
+				activeSubstageName == "Suit Contours" 
+				|| activeSubstageName == "Rank Contours" 
+				|| activeSubstageName == "Warped"
 			)
 			{
-				disp = sub_display_image;
+				disp = subDisplayImage;
 			}
 			else
 			{
-				cvtColor(sub_display_image, disp, cv::COLOR_GRAY2BGR);
+				cvtColor(subDisplayImage, disp, cv::COLOR_GRAY2BGR);
 			}
 			cvui::image(disp);
 		}
-		sub_image.end();
+		subImageWindow.end();
 
 		// Update cvui and draw frame
 		cvui::imshow(windowName, frame);
