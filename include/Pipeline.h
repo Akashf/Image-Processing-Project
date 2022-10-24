@@ -1,7 +1,9 @@
-#include "Utilities.h"
+#pragma once
 
-#include <string> 
-#include <vector>
+#include "PipelineStages.h"
+
+#include <unordered_map>
+#include <string>
 
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
@@ -15,126 +17,97 @@
 
 namespace mccd {
 
-    using GContour = cv::GArray<cv::Point>;
-
-    struct CannyParameters
-    {
-        size_t low_threshold = 0;
-        size_t high_threshold = 255;
-    };
-
-    struct GaussianParameters
-    {
-        size_t kernel_size = 3;
-        float sigma = 0;
-    };
-
-    struct ContourParameters
-    {
-        cv::RetrievalModes retMode = cv::RETR_EXTERNAL;
-        cv::ContourApproximationModes approxMode = cv::CHAIN_APPROX_SIMPLE;
-    };
-
-    template<typename T>
-    class GPipelineStage
+    template <typename TIn, typename TOut>
+    class GPipeline
     {
     public:
-        GPipelineStage(std::string name, cv::GMat in)
+        GPipeline(std::string name, TIn in) 
             : m_in(std::move(in))
-            , m_name(std::move(name))
-        {
-        }
+            , m_name(name) 
+        {}
+        virtual ~GPipeline() = default;
 
-        T getOutput() { return m_out; }
-        std::string getName() const { return m_name; }
+        virtual void execute() {}
 
-    protected:
-        virtual void setOutput() = 0;
+        virtual void setInput(TIn in) { m_in = in; }
+        virtual TOut getOutput() { return m_out; }
 
-        cv::GMat m_in;
-        T m_out;
+    protected: 
+        TIn m_in; 
+        TOut m_out;
         std::string m_name = "";
+        sPtr<cv::GComputation> m_pipelineInternal = nullptr;
     };
 
-    class GGaussianBlur : public GPipelineStage<cv::GMat>
+    class CardExtractionPipeline : public GPipeline<cv::Mat, mccd::Contours> 
     {
-    public:
-        GGaussianBlur(cv::GMat in, GaussianParameters params)
-            : GPipelineStage("GaussianBlur", std::move(in))
-            , m_params(std::move(params))
+    public: 
+        CardExtractionPipeline(
+            cv::Mat in,
+            GaussianParameters gaussParams,
+            CannyParameters cannyParams,
+            ContourParameters contourParams
+        )
+            : GPipeline("CardExtraction", in)
+            , m_gaussParams(gaussParams)
+            , m_cannyParams(cannyParams)
+            , m_contourParams(contourParams)
         {
-            setOutput();
-        }
+            cv::GMat g_in = {};
+            mccd::GGaussianBlur gaussianStage(g_in, m_gaussParams);
+            mccd::GHistEqualize equalizeStage(gaussianStage.getOutput());
+            mccd::GCannyEdges cannyStage(gaussianStage.getOutput(), m_cannyParams);
+            mccd::GContours contourStage(cannyStage.getOutput(), m_contourParams);
 
-    private:
-        virtual void setOutput() override
-        {
-            m_out = cv::gapi::gaussianBlur(
-                m_in,
-                cv::Size_<size_t>{ m_params.kernel_size, m_params.kernel_size },
-                m_params.sigma
+            cv::GMat g_equalized = equalizeStage.getOutput();
+            cv::GMat g_blurred = gaussianStage.getOutput();
+            cv::GMat g_edges = cannyStage.getOutput();
+            cv::GArray<mccd::GContour> g_contours = contourStage.getOutput();
+
+            m_pipelineInternal = std::make_shared<cv::GComputation>
+            (
+                cv::GIn(g_in),
+                cv::GOut(g_blurred, g_equalized, g_edges, g_contours)
             );
         }
 
-        GaussianParameters m_params = {};
-    };
-
-    class GHistEqualize : public GPipelineStage<cv::GMat>
-    {
-    public:
-        GHistEqualize(cv::GMat in)
-            : GPipelineStage("HistogramEqualization", std::move(in))
+        virtual void execute() override
         {
-            setOutput();
+            // Execute pipeline
+            m_stageOutputImages["Source"] = m_in;
+            m_pipelineInternal->apply
+            (
+                cv::gin(m_in),
+                cv::gout
+                (
+                    m_stageOutputImages["Blurred"],
+                    m_stageOutputImages["Equalized"],
+                    m_stageOutputImages["Edges"],
+                    m_contours
+                )
+            );
+
+            // Final output are card contours
+            m_out = m_contours;
         }
 
+        std::unordered_map<std::string, cv::Mat>& getStageOutputs()
+        {
+            return m_stageOutputImages;
+        }
+
+        mccd::Contours& getContours()
+        {
+            return m_contours;
+        }
+           
     protected:
-        virtual void setOutput() override
-        {
-            m_out = cv::gapi::equalizeHist(m_in);
-        }
-    };
+        GaussianParameters m_gaussParams = {};
+        CannyParameters m_cannyParams = {};
+        ContourParameters m_contourParams = {};
 
-    class GCannyEdges : public GPipelineStage<cv::GMat>
-    {
-    public:
-        GCannyEdges(cv::GMat in, CannyParameters params)
-            : GPipelineStage("CannyEdges", std::move(in))
-            , m_params(std::move(params))
-        {
-            setOutput();
-        }
-
-    private:
-        virtual void setOutput() override
-        {
-            m_out = cv::gapi::Canny(
-                m_in, 
-                m_params.low_threshold, 
-                m_params.high_threshold
-            );
-        }
-
-        CannyParameters m_params = {};
-    };
-
-    class GContours : public GPipelineStage<cv::GArray<GContour>>
-    {
-    public:
-        GContours(cv::GMat in, ContourParameters params)
-            : GPipelineStage("CannyEdges", std::move(in))
-            , m_params(std::move(params))
-        {
-            setOutput();
-        }
-
-    private:
-        virtual void setOutput() override
-        {
-            m_out = cv::gapi::findContours(m_in, m_params.retMode, m_params.approxMode);
-        }
-
-        ContourParameters m_params = {};
+        std::unordered_map<std::string, cv::Mat> m_stageOutputImages = {};
+        mccd::Contours m_contours = {};
     };
 
 } // namespace mccd
