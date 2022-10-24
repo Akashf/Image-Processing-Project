@@ -348,4 +348,5 @@ namespace mccd {
 		}
 		m_cardPipeOuts["Output"] = outputBase.clone();
 	}
+	
 }; // namespace mccd

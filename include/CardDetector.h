@@ -11,7 +11,6 @@
 
 namespace mccd {
 
-	// TODO: UI only? 
     const std::vector<std::string> sub_stage_titles = 
 	{
 		"Warped",
@@ -111,5 +110,5 @@ namespace mccd {
             { "Suit Bounded", cv::Mat::zeros(10, 10, CV_8UC1)}
         };
     };
-}; /// namespace mccd
-
+	
+}; // namespace mccd

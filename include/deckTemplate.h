@@ -5,6 +5,7 @@
 
 #include "opencv2/core.hpp"
 
+
 namespace mccd {
 
     using NamedImage = std::pair<std::string, cv::Mat>;
@@ -48,4 +49,3 @@ namespace mccd {
     };
 
 } // namespace mccd
-

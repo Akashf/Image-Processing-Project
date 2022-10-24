@@ -15,6 +15,7 @@
 #include "opencv2/gapi/core.hpp"
 #include "opencv2/gapi/imgproc.hpp"
 
+
 namespace mccd {
 
     template <typename TIn, typename TOut>

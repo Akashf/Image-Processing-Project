@@ -22,6 +22,7 @@
 #include "cvui.h"
 #include "EnhancedWindow.h"
 
+
 int main() 
 {   
 	// OpenCV config
@@ -70,7 +71,6 @@ int main()
 	std::string active_stage = "Source";
 	bool save_image = false;
 	bool save_subimage = false;
-	cv::Mat cards;
 	cv::Mat display_image;
 
 	// Operating data - Sub window
@@ -119,6 +119,7 @@ int main()
 			cards_color = source.clone();
 		}
 
+		// Execute card feature detection and identification 
 		cardDetector.update
 		(
 			cards_color, 
@@ -141,7 +142,7 @@ int main()
 		active_stage = mccd::stage_titles[active_image_index];
 		display_image = pipelineOut.at(active_stage);
 
-		// Select active sub image stage
+		// Select active sub image 
 		active_substage = mccd::sub_stage_titles[active_substage_index];
 
 		if (cardData.empty())
@@ -295,4 +296,3 @@ int main()
 
 	return 0;
 }
-

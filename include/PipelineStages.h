@@ -15,9 +15,8 @@
 #include "opencv2/gapi/core.hpp"
 #include "opencv2/gapi/imgproc.hpp"
 
-namespace mccd {
 
-    using GContour = cv::GArray<cv::Point>;
+namespace mccd {
 
     struct CannyParameters
     {
